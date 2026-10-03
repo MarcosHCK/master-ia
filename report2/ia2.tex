@@ -1,0 +1,172 @@
+% Copyright 2026 MarcosHCK
+%
+\documentclass{article}[12pt,a4paper]
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{bookmark}
+\usepackage{changepage}
+\usepackage{hyperref}
+\usepackage{cleveref} % must load after hyperref
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{inputenc}[utf8]
+\usepackage{indentfirst}
+\usepackage{polyglossia}[spanish,english]
+\usepackage{biblatex}[style=apa] % must load after polyglossia
+\usepackage{csquotes} % must load after biblatex
+\usepackage{setspace}
+\usepackage{pgf}
+\usepackage{xcolor}[dvipsnames]
+
+\setmainlanguage{spanish}
+\setotherlanguage{english}
+
+\setstretch{1.5}
+
+\def\mathdefault#1{#1}
+\newcommand{\myeoch}{\pagebreak}
+
+\definecolor{Aquamarine}{rgb}{0.498, 1, 0.83}
+\definecolor{DarkAquamarine}{rgb}{0.18, 0.55, 0.34}
+\definecolor{YellowOrange}{rgb}{1, 0.7, 0}
+\newcommand\myshade{85}
+\colorlet{mycitecolor}{YellowOrange}
+\colorlet{mylinkcolor}{violet}
+\colorlet{myurlcolor}{DarkAquamarine}
+
+\hypersetup {
+    colorlinks = true,
+    citecolor  = mycitecolor!\myshade!black,
+    linkcolor  = mylinkcolor!\myshade!black,
+    urlcolor   = myurlcolor!\myshade!black,
+  }
+
+\begin{document}
+
+\begin{titlepage}
+
+  \centering
+  {\huge\bfseries Reporte \#2\par}
+	{\Large Autor: \itshape Marcos Antonio Pérez Lorenzo\par}
+\end{titlepage}
+
+\pagebreak
+
+\section{Teoría}
+
+Sea la función \(f(x)\) donde:
+
+\begin{equation}
+  f(x)=\begin{cases}
+     3 & -\pi + 2k\pi < x < 0 + 2k\pi \\
+    -7 & 0 + 2k\pi < x < \pi + 2k\pi
+  \end{cases}
+  \label{eq:fx}
+\end{equation}
+
+Donde \(k\in\mathbb{R}\). Ver figura \ref{fig:original}.
+
+Se quiere analizar la convergencia de una aproximación mediante ciertas cantidades de elementos de la Serie de Fourier correspondiente a \(f(x)\). Para ello, primero es necesario calcular los coeficientes \(A_0\), \(A_n\) y \(B_n\):
+
+\begin{proof}
+
+  \begin{equation}
+    f(x)=\frac{A_0}{2}+\sum_{n=1}^{\infty}\left[A_n\cos\left(\frac{2n\pi}{T}x\right)+B_n\sin\left(\frac{2n\pi}{T}x\right)\right]
+    \label{eq:fourierseries}
+  \end{equation}
+
+  Sea \(P\) un intervalo definido como \(P=\left[-\frac{T}{2},\frac{T}{2}\right]\)
+
+  \begin{equation}
+    A_0=\frac{2}{T}\int_{P}f(x)\,dx
+    \label{eq:a0coeff}
+  \end{equation}
+  \begin{equation}
+    A_n=\frac{2}{T}\int_{P}f(x)\cos\left(\frac{2n\pi}{T}x\right)\,dx
+    \label{eq:ancoeff}
+  \end{equation}
+  \begin{equation}
+    B_n=\frac{2}{T}\int_{P}f(x)\sin\left(\frac{2n\pi}{T}x\right)\,dx
+    \label{eq:bncoeff}
+  \end{equation}
+
+  Para la función \ref{eq:fx}, \(P=\left[-\pi,\pi\right]\), el coeficiente \(A_0\) queda:
+
+  \begin{equation*}
+    A_0=\frac{2}{T}\int_{P}f(x)\,dx=\frac{1}{\pi}\int_{-\pi}^{0}3\,dx-\frac{1}{T}\int_{0}^{\pi}7\,dx
+  \end{equation*}
+  \begin{equation}
+    A_0=\frac{1}{\pi}\left[3x\right]_{-\pi}^{0}-\frac{1}{\pi}\left[7x\right]_{0}^{\pi}=-4
+    \label{eq:a0coeffr}
+  \end{equation}
+
+  \(A_n\) se desarrolla de la forma:
+
+  \begin{equation*}
+    A_n=\frac{2}{T}\int_{P}f(x)\cos\left(\frac{2n\pi}{T}x\right)\,dx=\frac{3}{\pi}\int_{-\pi}^{0}\cos\left(nx\right)\,dx-\frac{7}{\pi}\int_{0}^{\pi}\cos\left(nx\right)\,dx
+  \end{equation*}
+  \begin{equation*}
+    \int_{a}^{b}\cos\left(nx\right)\,dx=\left[\frac{\sin\left(nx\right)}{n}\right]_{a}^{b}
+  \end{equation*}
+  \begin{equation}
+    A_n=\frac{3}{\pi}\left[\frac{\sin\left(nx\right)}{n}\right]_{-\pi}^{0}-\frac{7}{\pi}\left[\frac{\sin\left(nx\right)}{n}\right]_{0}^{\pi}=0
+    \label{eq:ancoeffr}
+  \end{equation}
+
+  Finalmente \(B_n\) se expande como:
+
+  \begin{equation*}
+    B_n=\frac{2}{T}\int_{P}f(x)\sin\left(\frac{2n\pi}{T}x\right)\,dx=\frac{3}{\pi}\int_{-\pi}^{0}\sin\left(nx\right)\,dx-\frac{7}{\pi}\int_{0}^{\pi}\sin\left(nx\right)\,dx
+  \end{equation*}
+  \begin{equation*}
+    \int_{a}^{b}\sin\left(nx\right)\,dx=\left[-\frac{\cos\left(nx\right)}{n}\right]_{a}^{b}
+  \end{equation*}
+  \begin{equation*}
+    \int_{-\pi}^{0}\sin\left(nx\right)\,dx=\left[-\frac{\cos\left(nx\right)}{n}\right]_{-\pi}^{0}=\left[-\frac{1}{n}\right]-\left[-\frac{\cos\left(n\pi\right)}{n}\right]=\frac{\cos\left(n\pi\right)-1}{n}
+  \end{equation*}
+  \begin{equation*}
+    \int_{0}^{\pi}\sin\left(nx\right)\,dx=\left[-\frac{\cos\left(nx\right)}{n}\right]_{0}^{\pi}=\left[-\frac{\cos\left(n\pi\right)}{n}\right]-\left[-\frac{1}{n}\right]=\frac{1-\cos\left(n\pi\right)}{n}
+  \end{equation*}
+  \begin{equation*}
+    B_n=\frac{3}{\pi}\frac{\cos\left(n\pi\right)-1}{n}-\frac{7}{\pi}\frac{1-\cos\left(n\pi\right)}{n}=\frac{10}{\pi}\frac{\cos\left(n\pi\right)-1}{n}
+  \end{equation*}
+
+  Dado que \(cos\left(n\pi\right)=(-1)^n\), entonces obtenemos la expresión:
+
+  \begin{equation}
+    B_n=10\frac{(-1)^n-1}{n\pi}
+    \label{eq:bncoeffr}
+  \end{equation}
+
+  Utilizando los resultados \ref{eq:a0coeffr}, \ref{eq:ancoeffr} y \ref{eq:bncoeffr} expandiéndolos en la expresión \ref{eq:fourierseries}, obtenemos:
+
+  \begin{equation}
+    f(x)=-2+\frac{10}{\pi}\sum_{k=0}^{\infty}\frac{\sin\left(\left(2k+1\right)x\right)}{2k+1}
+  \end{equation}
+
+\end{proof}
+
+\section{Figuras}
+
+\subsection{Función original}
+
+\begin{figure}[H]
+  \begin{adjustwidth}{-0.33\linewidth}{-0.33\linewidth}
+    \resizebox{\linewidth}{!}{\input{fx.pgf}}
+  \end{adjustwidth}
+  \caption{f(x) original}
+  \label{fig:original}
+\end{figure}
+
+\subsection{Función aproximada}
+
+\begin{figure}[H]
+  \begin{adjustwidth}{-0.33\linewidth}{-0.33\linewidth}
+    \resizebox{\linewidth}{!}{\input{fxa.pgf}}
+  \end{adjustwidth}
+  \caption{f(x) aproximadas, más la original}
+  \label{fig:aprox}
+\end{figure}
+
+\end{document}
