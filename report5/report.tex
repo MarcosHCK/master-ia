@@ -1,0 +1,233 @@
+% Copyright 2026 MarcosHCK
+%
+\documentclass[12pt,a4paper]{article}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{changepage}
+\usepackage{hyperref}
+\usepackage{bookmark} % must load after hyperref
+\usepackage{cleveref} % must load after hyperref
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage[utf8]{inputenc}
+\usepackage{indentfirst}
+\usepackage{polyglossia} % languages set below via \setmainlanguage/\setotherlanguage
+\usepackage{setspace}
+\usepackage[dvipsnames]{xcolor}
+
+\setmainlanguage{spanish}
+\setotherlanguage{english}
+
+\setstretch{1.5}
+
+\def\mathdefault#1{#1}
+\newcommand{\myeoch}{\pagebreak}
+
+\providecolor{Aquamarine}{rgb}{0.498, 1, 0.83}
+\providecolor{DarkAquamarine}{rgb}{0.18, 0.55, 0.34}
+\providecolor{YellowOrange}{rgb}{1, 0.7, 0}
+\newcommand\myshade{85}
+\colorlet{mycitecolor}{YellowOrange}
+\colorlet{mylinkcolor}{violet}
+\colorlet{myurlcolor}{DarkAquamarine}
+
+\hypersetup {
+    colorlinks = true,
+    citecolor  = mycitecolor!\myshade!black,
+    linkcolor  = mylinkcolor!\myshade!black,
+    urlcolor   = myurlcolor!\myshade!black,
+  }
+
+\begin{document}
+
+\begin{titlepage}
+
+  \centering
+  {\huge\bfseries Reporte \#1\par}
+	{\Large Autor: \itshape Marcos Antonio Pérez Lorenzo\par}
+\end{titlepage}
+
+\pagebreak
+
+\section{Funciones de activación}
+
+Las funciones de activación son un componente esencial de las redes neuronales: introducen no linealidades en el modelo, lo que permite a la red aproximar funciones arbitrariamente complejas. Sin ellas, la composición de capas lineales se reduciría a una única transformación lineal y la red tendría la misma capacidad expresiva que un regresor lineal. A continuación se revisan las funciones de activación más comunes, y para cada una se indica su formulación matemática, su comportamiento y sus principales fortalezas y debilidades.
+
+\subsection{Función sigmoide (logística)}
+
+\subsubsection{Formulación matemática}
+La función sigmoide (o logística) se define como
+\begin{equation*}
+\sigma(x) = \frac{1}{1 + e^{-x}},
+\end{equation*}
+y su derivada admite una expresión cerrada muy cómoda:
+\begin{equation*}
+\sigma'(x) = \sigma(x)\bigl(1 - \sigma(x)\bigr).
+\end{equation*}
+
+\subsubsection{Comportamiento}
+Es una función suave (infinitamente diferenciable), estrictamente creciente y acotada entre $0$ y $1$, con forma de ``S''. Comprime cualquier valor real en el intervalo $(0, 1)$, por lo que su salida suele interpretarse como una probabilidad. Cerca de $x = 0$ crece de forma casi lineal, mientras que para valores grandes de $|x|$ se satura: la salida se aproxima asintóticamente a $0$ o a $1$ y su derivada tiende a cero.
+
+\subsubsection{Fortalezas y debilidades}
+Su principal fortaleza es que es diferenciable en todo punto, tiene rango acotado --- apto para producir probabilidades --- y su derivada se obtiene trivialmente a partir de la propia salida. Sin embargo, adolece de dos problemas serios: su salida no está centrada en cero, lo que puede ralentizar el entrenamiento, y sufre de manera aguda el desvanecimiento del gradiente, pues en las zonas de saturación la derivada se anula y apenas fluye información hacia las capas anteriores. Por ello se utiliza sobre todo en la capa de salida de clasificadores binarios y rara vez en capas ocultas.
+
+\subsection{Tangente hiperbólica (tanh)}
+
+\subsubsection{Formulación matemática}
+La tangente hiperbólica se define como
+\begin{equation*}
+\tanh(x) = \frac{e^{x} - e^{-x}}{e^{x} + e^{-x}} = 2\,\sigma(2x) - 1,
+\end{equation*}
+donde $\sigma$ es la función sigmoide. Su derivada es
+\begin{equation*}
+\tanh'(x) = 1 - \tanh^2(x).
+\end{equation*}
+
+\subsubsection{Comportamiento}
+Como la sigmoide, es estrictamente creciente, suave y se satura en los extremos, pero su salida está acotada entre $-1$ y $1$ y, lo más importante, está centrada en cero. Su simetría respecto del origen hace que las activaciones de una capa sean, en promedio, nulas, lo que suele acelerar la convergencia. En un entorno de $x = 0$ el comportamiento es aproximadamente lineal; al crecer $|x|$ la función se satura hacia $\pm 1$ y la derivada se anula.
+
+\subsubsection{Fortalezas y debilidades}
+Su ventaja principal frente a la sigmoide es la salida centrada en cero, que evita que las activaciones se desplacen sistemáticamente en una dirección y reduce la saturación en las primeras iteraciones. Sin embargo, comparte con aquella el desvanecimiento del gradiente en las regiones de saturación y el coste de evaluar exponenciales. Fue la activación estándar de las capas ocultas antes de la popularización de la ReLU y todavía se emplea en redes recurrentes y en salidas acotadas en $(-1, 1)$.
+
+\subsection{ReLU (unidad lineal rectificada)}
+
+\subsubsection{Formulación matemática}
+La unidad lineal rectificada (ReLU, del inglés \emph{rectified linear unit}) se define a trozos como
+\begin{equation*}
+f(x) = \max(0, x) =
+\begin{cases}
+x, & x \geq 0,\\
+0, & x < 0.
+\end{cases}
+\end{equation*}
+No es diferenciable en $x = 0$; en la práctica se adopta la subderivada $f'(0) = 0$, de modo que
+\begin{equation*}
+f'(x) =
+\begin{cases}
+1, & x > 0,\\
+0, & x < 0.
+\end{cases}
+\end{equation*}
+
+\subsubsection{Comportamiento}
+Es la función identidad para entradas positivas y nula para entradas negativas, por lo que su rango es $[0, +\infty)$. En el semieje positivo no satura y el gradiente fluye íntegramente hacia las capas anteriores; en el semieje negativo la salida es exactamente cero, lo que induce activaciones dispersas (\emph{sparse}) que, de hecho, pueden resultar beneficiosas. La falta de diferenciabilidad en $x = 0$ no supone un problema práctico, ya que la probabilidad de que una activación valga exactamente cero es despreciable.
+
+\subsubsection{Fortalezas y debilidades}
+Sus fortalezas son el coste computacional mínimo (una comparación), la ausencia de saturación en la región positiva --- que mitiga el desvanecimiento del gradiente --- y, empíricamente, una convergencia más rápida que la de sigmoide o tanh. Su debilidad principal es el llamado problema de las ``neuronas muertas'' (\emph{dying ReLU}): si una neurona recibe entradas siempre negativas, su gradiente es nulo y nunca logra recuperarse. Además, su salida no está acotada ni centrada en cero. Es, pese a todo, la activación por defecto de las capas ocultas de la mayoría de las redes modernas.
+
+\subsection{Leaky ReLU y PReLU}
+
+\subsubsection{Formulación matemática}
+La variante \emph{leaky} ReLU (ReLU con fugas) introduce una pendiente pequeña $\alpha$ en el semieje negativo:
+\begin{equation*}
+f(x) =
+\begin{cases}
+x, & x \geq 0,\\
+\alpha x, & x < 0,
+\end{cases}
+\qquad 0 < \alpha \ll 1.
+\end{equation*}
+En la ReLU con fugas el parámetro $\alpha$ es un hiperparámetro fijo (habitualmente $\alpha = 0.01$); en la PReLU (\emph{parametric ReLU}) se convierte en un parámetro que se aprende junto con el resto de la red. Su derivada es
+\begin{equation*}
+f'(x) =
+\begin{cases}
+1, & x \geq 0,\\
+\alpha, & x < 0.
+\end{cases}
+\end{equation*}
+
+\subsubsection{Comportamiento}
+El comportamiento es cualitativamente idéntico al de la ReLU en el semieje positivo, pero en el negativo la función, en lugar de anularse, conserva un pequeño flujo de gradiente proporcional a $\alpha$. De este modo una neurona con entradas negativas no queda completamente muerta, aunque su activación siga siendo pequeña. Cuanto mayor es $\alpha$, más se acerca la función a la identidad en todo el dominio y menos dispersas resultan las activaciones.
+
+\subsubsection{Fortalezas y debilidades}
+La ventaja frente a la ReLU es que elimina (o reduce drásticamente) el problema de las neuronas muertas, manteniendo un coste computacional mínimo. En la PReLU, además, la pendiente negativa se adapta a los datos, lo que en algunos problemas mejora la precisión. Como contrapartida, la ReLU con fugas añade un hiperparámetro cuya elección es algo arbitraria, y la PReLU multiplica los parámetros de la red, con el consiguiente riesgo de sobreajuste. En la práctica ambas se usan como sustitutos directos de la ReLU en capas ocultas.
+
+\subsection{ELU (unidad lineal exponencial)}
+
+\subsubsection{Formulación matemática}
+La unidad lineal exponencial (ELU), propuesta por Clevert \emph{et al.} (2015), se define como
+\begin{equation*}
+f(x) =
+\begin{cases}
+x, & x \geq 0,\\
+\alpha \bigl(e^{x} - 1\bigr), & x < 0,
+\end{cases}
+\end{equation*}
+con $\alpha > 0$ (típicamente $\alpha = 1$). Es diferenciable en todo punto y su derivada es
+\begin{equation*}
+f'(x) =
+\begin{cases}
+1, & x \geq 0,\\
+f(x) + \alpha, & x < 0.
+\end{cases}
+\end{equation*}
+
+\subsubsection{Comportamiento}
+Para entradas positivas se comporta como la identidad y para entradas negativas se aproxima asintóticamente a $-\alpha$, de modo que su salida está acotada inferiormente y, al no anularse, las activaciones quedan centradas cerca de cero. La transición en torno a $x = 0$ es suave, sin el vértice anguloso de la ReLU, lo que estabiliza el entrenamiento. Al igual que la ReLU, no satura en el semieje positivo y permite un flujo de gradiente sin compresión en esa región.
+
+\subsubsection{Fortalezas y debilidades}
+Sus fortalezas son la diferenciabilidad en todo el dominio, una media de activaciones próxima a cero (lo que acelera y estabiliza el aprendizaje) y la ausencia de neuronas muertas, ya que también en el semieje negativo existe gradiente. Sus debilidades son el mayor coste de evaluación, debido a la exponencial, y la sensibilidad al hiperparámetro $\alpha$. Su variante con parámetros aprendibles y reescalado se conoce como SELU (\emph{scaled ELU}). En la práctica la mejora frente a la ReLU suele ser modesta y dependiente de la arquitectura.
+
+\subsection{Softplus}
+
+\subsubsection{Formulación matemática}
+La función softplus se define como
+\begin{equation*}
+f(x) = \ln\bigl(1 + e^{x}\bigr),
+\end{equation*}
+y su derivada es precisamente la función sigmoide:
+\begin{equation*}
+f'(x) = \sigma(x) = \frac{1}{1 + e^{-x}}.
+\end{equation*}
+Por estabilidad numérica, en la práctica suele evaluarse de forma equivalente como $f(x) = \max(x, 0) + \ln\bigl(1 + e^{-|x|}\bigr)$.
+
+\subsubsection{Comportamiento}
+Es una aproximación suave y estrictamente creciente de la ReLU: para valores positivos grandes se comporta como la identidad y para valores negativos muy grandes tiende a cero, pero, a diferencia de la ReLU, nunca se anula exactamente y es diferenciable en todo punto. Su salida está acotada inferiormente por cero de forma asintótica, y la transición en torno a $x = 0$ es redondeada. Al ser la primitiva de la sigmoide, aparece de forma natural en ciertos modelos estadísticos, por ejemplo como relajación suave del operador $\max(0, \cdot)$.
+
+\subsubsection{Fortalezas y debilidades}
+Su fortaleza principal es que es suave y diferenciable, lo que la hace compatible con análisis teóricos y optimizadores que requieren derivadas continuas, y que su gradiente nunca se anula por completo, de modo que no existen neuronas muertas en sentido estricto. Sus debilidades son el coste computacional (exponencial y logaritmo), la ausencia de centrado en cero y una convergencia en la práctica más lenta que la de la ReLU. Se emplea sobre todo cuando se necesita una relajación diferenciable de la ReLU o del operador máximo.
+
+\subsection{GELU (unidad lineal con error gaussiano)}
+
+\subsubsection{Formulación matemática}
+La unidad lineal con error gaussiano (GELU), propuesta por Hendrycks y Gimpel (2016), se define como
+\begin{equation*}
+f(x) = x\,\Phi(x),
+\end{equation*}
+donde $\Phi$ es la función de distribución acumulada de la normal estándar. En la práctica se aproxima mediante la sigmoide como
+\begin{equation*}
+f(x) \approx x\,\sigma(1.702\,x),
+\end{equation*}
+y su derivada es
+\begin{equation*}
+f'(x) = \Phi(x) + x\,\varphi(x),
+\end{equation*}
+siendo $\varphi$ la función de densidad de la normal estándar.
+
+\subsubsection{Comportamiento}
+La GELU interpola entre el comportamiento lineal de la identidad y el de anulación de la ReLU: crece de forma casi lineal en el semieje positivo y se atenúa de manera suave y continua en el negativo, sin vértice anguloso y sin saturación abrupta. En la región negativa el gradiente, aunque pequeño, no se anula del todo. A diferencia de la ReLU es no monótona, pero su suavidad favorece el flujo del gradiente.
+
+\subsubsection{Fortalezas y debilidades}
+Sus fortalezas son la diferenciabilidad en todo el dominio, la combinación de las ventajas de la ReLU (ausencia de saturación en la región positiva) con una transición continua, y su buen comportamiento empírico en arquitecturas modernas, especialmente Transformers y modelos preentrenados (por ejemplo, BERT y GPT), donde ha superado a la ReLU. Su principal debilidad es el coste de evaluación, mayor que el de la ReLU, al requerir la función de error gaussiana o una aproximación con exponenciales y sigmoide. Se ha convertido en la activación por defecto de muchas arquitecturas basadas en atención.
+
+\subsection{Softmax}
+
+\subsubsection{Formulación matemática}
+A diferencia de las anteriores, la softmax opera sobre un vector de logits $\mathbf{z} = (z_1, \dotsc, z_K)$ y produce un vector de salida cuyo componente $i$-ésimo es
+\begin{equation*}
+\sigma_i(\mathbf{z}) = \frac{e^{z_i}}{\sum_{j=1}^{K} e^{z_j}}, \qquad i = 1, \dotsc, K.
+\end{equation*}
+Su derivada parcial tiene estructura de jacobiana:
+\begin{equation*}
+\frac{\partial \sigma_i}{\partial z_j} = \sigma_i\bigl(\delta_{ij} - \sigma_j\bigr),
+\end{equation*}
+donde $\delta_{ij}$ es la delta de Kronecker.
+
+\subsubsection{Comportamiento}
+La softmax transforma un vector arbitrario de valores reales en una distribución de probabilidad: todas sus salidas son no negativas y suman uno. Es invariante a traslaciones --- sumar una constante a todos los logits no altera las probabilidades ---, aunque en la práctica se resta el máximo de los logits por estabilidad numérica. Si un logit domina fuertemente a los demás, la distribución se concentra en él (comportamiento cercano al del $\arg\max$); si los logits son parecidos, las probabilidades se reparten casi uniformemente.
+
+\subsubsection{Fortalezas y debilidades}
+Su fortaleza es que constituye la salida natural de un clasificador multiclase, ya que produce probabilidades interpretables y diferenciables; además, combinada con la pérdida de entropía cruzada, su gradiente adopta una forma numéricamente estable y muy eficiente de calcular. Sus debilidades son que comprime el gradiente de los logits muy negativos --- que apenas reciben señal ---, que induce una confianza quizá excesiva en la predicción y que, al normalizar a suma uno, es inadecuada como activación de capas ocultas (los componentes quedan redundantes). Por ello se reserva, casi exclusivamente, para la capa de salida de clasificadores.
+
+\end{document}
