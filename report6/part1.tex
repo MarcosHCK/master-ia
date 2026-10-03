@@ -1,0 +1,85 @@
+% Copyright 2026 MarcosHCK
+%
+\documentclass[12pt,a4paper]{article}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{changepage}
+\usepackage{hyperref}
+\usepackage{bookmark} % must load after hyperref
+\usepackage{cleveref} % must load after hyperref
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage[utf8]{inputenc}
+\usepackage{indentfirst}
+\usepackage{polyglossia} % languages set below via \setmainlanguage/\setotherlanguage
+\usepackage{setspace}
+\usepackage[dvipsnames]{xcolor}
+
+\setmainlanguage{spanish}
+\setotherlanguage{english}
+
+\setstretch{1.5}
+
+\def\mathdefault#1{#1}
+\newcommand{\myeoch}{\pagebreak}
+
+\providecolor{Aquamarine}{rgb}{0.498, 1, 0.83}
+\providecolor{DarkAquamarine}{rgb}{0.18, 0.55, 0.34}
+\providecolor{YellowOrange}{rgb}{1, 0.7, 0}
+\newcommand\myshade{85}
+\colorlet{mycitecolor}{YellowOrange}
+\colorlet{mylinkcolor}{violet}
+\colorlet{myurlcolor}{DarkAquamarine}
+
+\hypersetup {
+    colorlinks = true,
+    citecolor  = mycitecolor!\myshade!black,
+    linkcolor  = mylinkcolor!\myshade!black,
+    urlcolor   = myurlcolor!\myshade!black,
+  }
+
+\begin{document}
+
+\begin{titlepage}
+
+  \centering
+  {\huge\bfseries Reporte \#6 --- Parte 1\par}
+	{\Large Autor: \itshape Marcos Antonio Pérez Lorenzo\par}
+\end{titlepage}
+
+\pagebreak
+
+\section{Perceptrón sigmoide para una votación ponderada}
+
+\subsection{Descripción de la red}
+
+El archivo \texttt{perceptron.m} implementa una red neuronal de un perceptrón. Sus siete entradas representan siete votos binarios (1 para sí, 0 para no) con pesos \([1,2,1,2,1,2,1]\). La expresión matemática es:
+\begin{equation*}
+  y = \sigma\!\left(\sum_{i=1}^{7} w_i x_i + b\right)
+    = \frac{1}{1 + e^{-\left(\sum_{i=1}^{7} w_i x_i + b\right)}}.
+\end{equation*}
+La salida es un valor entre cero y uno. Para tomar la decisión final, se utiliza el valor umbral \(0.5\): una salida igual o superior se interpreta como sí y una inferior como no.
+
+\subsection{Organización del programa}
+
+El programa comienza definiendo la cantidad de votos, los pesos de referencia y el umbral. A continuación genera las \(2^7=128\) combinaciones posibles de votos y asigna a cada una su respuesta objetivo aplicando la regla ponderada. De esta manera, los ejemplos de entrenamiento cubren todas las entradas binarias posibles para esta tarea.
+
+La siguiente parte inicializa los siete pesos y el sesgo en cero, y establece la tasa de aprendizaje y el límite de épocas. Durante el entrenamiento, calcula la suma ponderada y la salida sigmoide para cada ejemplo, y ajusta los parámetros. Al terminar cada época, vuelve a evaluar las 128 combinaciones para comprobar si todas quedan clasificadas correctamente.
+
+\subsection{Entrenamiento}
+
+El aprendizaje es supervisado: para cada combinación de votos ya se conoce la respuesta que dicta la regla de referencia. La neurona procesa los ejemplos uno por uno y actualiza los pesos y el sesgo mediante descenso por gradiente sobre el error cuadrático, usando la derivada de la sigmoide para calcular la corrección. La tasa de aprendizaje es \(0.5\), y se permiten hasta \(5000\) épocas. El entrenamiento se detiene antes si, al aplicar un umbral de \(0.5\), todas las combinaciones tienen la clase correcta.
+
+\subsection{Resultados}
+
+La ejecución terminó tras \(23\) de las \(5000\) épocas permitidas. Los pesos obtenidos fueron aproximadamente:
+$$[1.263010,\,2.922768,\,1.396897,\,2.985553,\,1.421800,\,3.025049,\,1.428059]$$
+Y sesgo
+$$-7.466145$$
+
+No es necesario que estos valores coincidan exactamente con los pesos de referencia, lo relevante es que reproduzcan las decisiones de la regla.
+
+El programa clasificó correctamente las \(128\) combinaciones, es decir, obtuvo una exactitud de entrenamiento del \(100.00\%\). Entre los ejemplos impresos, la entrada \([0,0,0,0,0,0,0]\) produjo una salida sigmoide de \(0.000572\) y la decisión ``No''; la entrada \([1,1,1,1,1,1,1]\) produjo \(0.999068\) y ``Sí''. Para la entrada de demostración \([1,0,1,1,0,1,0]\), la suma ponderada aprendida fue \(8.670509\), la salida fue \(0.769300\) (decisión: sí).
+
+\end{document}

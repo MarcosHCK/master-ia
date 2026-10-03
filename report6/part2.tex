@@ -1,0 +1,94 @@
+% Copyright 2026 MarcosHCK
+%
+\documentclass[12pt,a4paper]{article}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{changepage}
+\usepackage{hyperref}
+\usepackage{bookmark} % must load after hyperref
+\usepackage{cleveref} % must load after hyperref
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage[utf8]{inputenc}
+\usepackage{indentfirst}
+\usepackage{polyglossia} % languages set below via \setmainlanguage/\setotherlanguage
+\usepackage{setspace}
+\usepackage[dvipsnames]{xcolor}
+
+\setmainlanguage{spanish}
+\setotherlanguage{english}
+
+\setstretch{1.5}
+
+\def\mathdefault#1{#1}
+\newcommand{\myeoch}{\pagebreak}
+
+\providecolor{Aquamarine}{rgb}{0.498, 1, 0.83}
+\providecolor{DarkAquamarine}{rgb}{0.18, 0.55, 0.34}
+\providecolor{YellowOrange}{rgb}{1, 0.7, 0}
+\newcommand\myshade{85}
+\colorlet{mycitecolor}{YellowOrange}
+\colorlet{mylinkcolor}{violet}
+\colorlet{myurlcolor}{DarkAquamarine}
+
+\hypersetup {
+    colorlinks = true,
+    citecolor  = mycitecolor!\myshade!black,
+    linkcolor  = mylinkcolor!\myshade!black,
+    urlcolor   = myurlcolor!\myshade!black,
+  }
+
+\begin{document}
+
+\begin{titlepage}
+
+  \centering
+  {\huge\bfseries Reporte \#6 --- Parte 2\par}
+	{\Large Autor: \itshape Marcos Antonio Pérez Lorenzo\par}
+\end{titlepage}
+
+\pagebreak
+
+\section{Red neuronal sigmoide para clasificación binaria}
+
+\subsection{Descripción de la red}
+
+El archivo \texttt{perceptronnet.m} implementa una red neuronal totalmente conectada con tres entradas binarias, una capa oculta de siete neuronas y una neurona de salida. Todas las neuronas utilizan la función sigmoide. La salida, que está entre cero y uno, se convierte en una clase binaria utilizando el umbral \(0.5\).
+
+El programa utiliza las ocho combinaciones posibles de tres entradas y sus objetivos: \([0,1,1,1,1,0,1,1]\), ordenadas desde \([0,0,0]\) hasta \([1,1,1]\). La red aprende a reproducir esta correspondencia.
+
+\subsection{Organización del programa}
+
+El programa comienza definiendo los ejemplos de entrenamiento y comprobando que cada uno tenga tres entradas y un objetivo binarios. Luego configura la red, inicializa los pesos entre \(-1\) y \(1\), fija los sesgos en cero y establece una semilla aleatoria para que la ejecución sea reproducible.
+
+Durante el entrenamiento, la red calcula las activaciones de la capa oculta y la salida final para cada ejemplo, y utiliza el error para ajustar sus parámetros. Al finalizar, vuelve a evaluar los ejemplos e imprime las salidas y decisiones, además de mostrar un cálculo completo para la primera entrada, \([0,0,0]\).
+
+\subsection{Entrenamiento}
+
+El aprendizaje es supervisado: para cada patrón se conoce el objetivo esperado. La red utiliza retropropagación y descenso por gradiente para reducir el error cuadrático. En cada época procesa los ocho ejemplos, acumula sus gradientes y actualiza los parámetros con el gradiente promedio. La tasa de aprendizaje es \(1.0\), y se permiten hasta \(30000\) épocas.
+
+El entrenamiento se detiene antes si todos los ejemplos se clasifican correctamente con el umbral \(0.5\) y sus salidas quedan al menos \(0.05\) alejadas de ese umbral: como máximo \(0.45\) para los objetivos cero y como mínimo \(0.55\) para los objetivos uno.
+
+\subsection{Resultados}
+
+La ejecución terminó en la época \(1039\), de un máximo de \(30000\). Las salidas sigmoides impresas para las ocho entradas fueron:
+\begin{center}
+\begin{tabular}{cccc}
+\hline
+Entrada & Objetivo & Salida sigmoide & Decisión \\
+\hline
+\([0,0,0]\) & 0 & 0.438942 & 0 \\
+\([0,0,1]\) & 1 & 0.573291 & 1 \\
+\([0,1,0]\) & 1 & 0.973167 & 1 \\
+\([0,1,1]\) & 1 & 0.967402 & 1 \\
+\([1,0,0]\) & 1 & 0.550177 & 1 \\
+\([1,0,1]\) & 0 & 0.427820 & 0 \\
+\([1,1,0]\) & 1 & 0.954257 & 1 \\
+\([1,1,1]\) & 1 & 0.966690 & 1 \\
+\hline
+\end{tabular}
+\end{center}
+El programa clasificó correctamente los ocho ejemplos, con una exactitud de \(100.00\%\). Por ejemplo, para \([0,0,0]\) obtuvo una salida de \(0.438942\) y predijo la clase \(0\), que coincide con el objetivo. Esta exactitud corresponde a los mismos patrones utilizados para el entrenamiento; el programa no reserva ejemplos para una evaluación de prueba independiente.
+
+\end{document}
