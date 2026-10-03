@@ -1,0 +1,197 @@
+% Copyright 2026 MarcosHCK
+%
+\documentclass{article}[12pt,a4paper]
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{bookmark}
+\usepackage{hyperref}
+\usepackage{cleveref} % must load after hyperref
+\usepackage{graphicx}
+\usepackage{inputenc}[utf8]
+\usepackage{indentfirst}
+\usepackage{polyglossia}[spanish,english]
+\usepackage{biblatex}[style=apa] % must load after polyglossia
+\usepackage{csquotes} % must load after biblatex
+\usepackage{setspace}
+\usepackage{svg}
+\usepackage{xcolor}[dvipsnames]
+
+\setmainlanguage{spanish}
+\setotherlanguage{english}
+
+\setstretch{1.5}
+
+\newcommand{\myeoch}{\pagebreak}
+
+\definecolor{Aquamarine}{rgb}{0.498, 1, 0.83}
+\definecolor{DarkAquamarine}{rgb}{0.18, 0.55, 0.34}
+\definecolor{YellowOrange}{rgb}{1, 0.7, 0}
+\newcommand\myshade{85}
+\colorlet{mycitecolor}{YellowOrange}
+\colorlet{mylinkcolor}{violet}
+\colorlet{myurlcolor}{DarkAquamarine}
+
+\hypersetup {
+    colorlinks = true,
+    citecolor  = mycitecolor!\myshade!black,
+    linkcolor  = mylinkcolor!\myshade!black,
+    urlcolor   = myurlcolor!\myshade!black,
+  }
+
+\begin{document}
+
+\begin{titlepage}
+
+  \centering
+  {\huge\bfseries Reporte \#1\par}
+	{\Large Autor: \itshape Marcos Antonio Pérez Lorenzo\par}
+\end{titlepage}
+
+\pagebreak
+
+\section{Teoría}
+
+\subsection{High-pass}
+Sea el circuito RC de la forma:
+
+\begin{proof}
+
+  El voltaje de entrada a través del tiempo se expresa como (usando la ley de Kirchhof):
+
+  $$V_{i}(t)=V_{r}(t)+V_{c}(t)$$
+
+  Si se expanden las formulas correspondientes a las voltajes:
+
+  $$V_{i}(t)=I(t)*R+\frac{1}{C}\int I(t)\,dt$$
+
+  Utilizando la transformada de Laplace:
+
+  $$V_{i}(s)=I(s)*R+\frac{1}{C}\frac{1}{s}*I(s)$$
+
+  \begin{equation}
+    V_{i}(s)=I(s)\left(R+\frac{1}{Cs}\right)
+    \label{eq:high1}
+  \end{equation}
+
+  Para el voltaje de salida es similar:
+
+  $$V_{o}(t)=V_{r}(t)$$
+  $$V_{o}(t)=I(t)*R$$
+
+  \begin{equation}
+    V_{o}(s)=I(s)*R
+    \label{eq:high2}
+  \end{equation}
+
+  Finalmente, para calcular la expresión de la transformación \(T(s)\), se combinan \ref{eq:high1} y \ref{eq:high2}:
+
+  $$T(s)=\frac{V_{o}(s)}{V_{i}(s)}$$
+  $$T(s)=\frac{I(s)R}{I(s)\left(R+\frac{1}{Cs}\right)}$$
+  $$T(s)=\frac{R}{R+\frac{1}{Cs}}$$
+  $$T(s)=\frac{1}{1+\frac{1}{RCs}}$$
+  $$T(s)=\frac{1}{\frac{1+RCs}{RCs}}$$
+
+  \begin{equation}
+    T(s)=\frac{RCs}{1+RCs}
+    \label{eq:rhigh}
+  \end{equation}
+\end{proof}
+
+\subsection{Low-pass}
+Sea el circuito RC de la forma:
+
+\begin{proof}
+
+  El voltaje de entrada a través del tiempo se expresa como (usando la ley de Kirchhof):
+
+  $$V_{i}(t)=V_{r}(t)+V_{c}(t)$$
+
+  Si se expanden las formulas correspondientes a las voltajes:
+
+  $$V_{i}(t)=I(t)*R+\frac{1}{C}\int I(t)\,dt$$
+
+  Utilizando la transformada de Laplace:
+
+  $$V_{i}(s)=I(s)*R+\frac{1}{C}\frac{1}{s}*I(s)$$
+
+  \begin{equation}
+    V_{i}(s)=I(s)\left(R+\frac{1}{Cs}\right)
+    \label{eq:low1}
+  \end{equation}
+
+  Para el voltaje de salida es similar:
+
+  $$V_{o}(t)=V_{c}(t)$$
+  $$V_{o}(t)=\frac{1}{C}\int I(t)\,dt$$
+
+  Aplicando la transformación de Laplace nuevamente:
+
+  $$V_{o}(s)=\frac{1}{C}\frac{1}{s}I(s)$$
+
+  \begin{equation}
+    V_{o}(s)=\frac{I(s)}{Cs}
+    \label{eq:low2}
+  \end{equation}
+
+  Finalmente, para calcular la expresión de la transformación \(T(s)\), se combinan \ref{eq:low1} y \ref{eq:low2}:
+
+  $$T(s)=\frac{V_{o}(s)}{V_{i}(s)}$$
+  $$T(s)=\frac{\frac{I(s)}{Cs}}{I(s)\left(R+\frac{1}{Cs}\right)}$$
+  $$T(s)=\frac{1}{Cs*\left(R+\frac{1}{Cs}\right)}$$
+
+  \begin{equation}
+    T(s)=\frac{1}{1+RCs}
+    \label{eq:rlow}
+  \end{equation}
+\end{proof}
+
+\section{Casos}
+
+\subsection{Dominio de frecuencias}
+
+Para representar ambas ecuaciones \ref{eq:rhigh} y \ref{eq:rlow}, debemos primero transformar ambas de funciones complejas a magnitudes reales, substituyendo (donde \(f\) es la frecuencia):
+
+\begin{equation*}
+  s=\jmath\omega=\jmath2\pi f
+\end{equation*}
+
+Luego, para el filtro high-pass:
+
+\begin{proof}
+
+  $$T(\jmath\omega)=\frac{RC\jmath\omega}{1+RC\jmath\omega}$$
+  $$\left|T(\jmath\omega)\right|=\frac{\left|RC\jmath\omega\right|}{\left|1+RC\jmath\omega\right|}$$
+
+  \begin{equation}
+    \left|T(\jmath\omega)\right|=\frac{\omega RC}{\sqrt{1+\left(\omega RC\right)^2}}
+    \label{eq:realhigh}
+  \end{equation}
+\end{proof}
+
+En el caso del filtro low-pass:
+
+\begin{proof}
+
+  $$T(\jmath\omega)=\frac{1}{1+RC\jmath\omega}$$
+  $$\left|T(\jmath\omega)\right|=\frac{1}{\left|1+RC\jmath\omega\right|}$$
+
+  \begin{equation}
+    \left|T(\jmath\omega)\right|=\frac{1}{\sqrt{1+\left(\omega RC\right)^2}}
+    \label{eq:reallow}
+  \end{equation}
+\end{proof}
+
+\subsection{Gráfica}
+
+\begin{figure*}
+  \includesvg[width=1\textwidth]{high_pass.svg}
+  \caption{Gráfica para el filtro high-pass}
+\end{figure*}
+
+\begin{figure*}
+  \includesvg[width=1\textwidth]{low_pass.svg}
+  \caption{Gráfica para el filtro low-pass}
+\end{figure*}
+
+\end{document}
