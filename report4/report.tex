@@ -1,0 +1,369 @@
+% Copyright 2026 MarcosHCK
+%
+\documentclass[12pt,a4paper]{article}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{changepage}
+\usepackage{hyperref}
+\usepackage{bookmark} % must load after hyperref
+\usepackage{cleveref} % must load after hyperref
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage[utf8]{inputenc}
+\usepackage{indentfirst}
+\usepackage{polyglossia} % languages set below via \setmainlanguage/\setotherlanguage
+\usepackage{biblatex} % APA style requires biblatex-apa (not installed); no citations used
+% must load after polyglossia
+\usepackage{csquotes} % must load after biblatex
+\usepackage{setspace}
+\usepackage{pgf}
+\usepackage[dvipsnames]{xcolor}
+
+\setmainlanguage{spanish}
+\setotherlanguage{english}
+
+\setstretch{1.5}
+
+\def\mathdefault#1{#1}
+\newcommand{\myeoch}{\pagebreak}
+
+\providecolor{Aquamarine}{rgb}{0.498, 1, 0.83}
+\providecolor{DarkAquamarine}{rgb}{0.18, 0.55, 0.34}
+\providecolor{YellowOrange}{rgb}{1, 0.7, 0}
+\newcommand\myshade{85}
+\colorlet{mycitecolor}{YellowOrange}
+\colorlet{mylinkcolor}{violet}
+\colorlet{myurlcolor}{DarkAquamarine}
+
+\hypersetup {
+    colorlinks = true,
+    citecolor  = mycitecolor!\myshade!black,
+    linkcolor  = mylinkcolor!\myshade!black,
+    urlcolor   = myurlcolor!\myshade!black,
+  }
+
+\begin{document}
+
+\begin{titlepage}
+
+  \centering
+  {\huge\bfseries Ejercicios \#1\par}
+	{\Large Autor: \itshape Marcos Antonio Pérez Lorenzo\par}
+\end{titlepage}
+
+\pagebreak
+
+\section{Ejercicios}
+
+\subsection{Ejercicio \#1}
+
+\subsubsection{Enunciado}
+
+Para la señalización de emergencia de una fábrica se han instalado dos indicadores que funcionan independientemente. La probabilidad de que el indicador \textbf{A} se accione en una avería es \(0.99\), mientras que la de que se accione el indicador \textbf{B} es \(0.95\). Si se produce una avería:
+\begin{itemize}
+  \item[a)] ¿Cuál es la probabilidad de que se accione un solo indicador?
+  \item[b)] ¿Cuál es la probabilidad de que no se accione ningún indicador?
+\end{itemize}
+
+\subsubsection{Solución}
+
+Dado que la ocurrencia de que un indicador (sea \textbf{A} o \textbf{B}) se accione en una avería es independiente de que el otro lo haga o no, ambas probabilidades son a su vez independientes. Luego
+
+\begin{proof}
+
+  \begin{equation*}
+    P(A = \text{'Indicador \textbf{A} se acciona en una avería'})=0.99
+  \end{equation*}
+  \begin{equation*}
+    P(B = \text{'Indicador \textbf{B} se acciona en una avería'})=0.95
+  \end{equation*}
+
+  Para resolver (a) se debe encontrar la probabilidad de que solo un suceso \textit{A} o \textit{B} ocurra. Es decir:
+
+  \begin{equation*}
+    P((A\cap B^{\textbf{c}})\cup (A^{\textbf{c}}\cap B))
+  \end{equation*}
+  \begin{equation*}
+    P(A\cap B^{\textbf{c}})+P(A^{\textbf{c}}\cap B)
+  \end{equation*}
+  \begin{equation*}
+    P(A)\cdot P(B^{\textbf{c}})+P(A^{\textbf{c}})\cdot P(B)
+  \end{equation*}
+  \begin{equation*}
+    P(A)\cdot (1-P(B))+(1-P(A))\cdot P(B)
+  \end{equation*}
+  \begin{equation*}
+    P(A)-P(A)\cdot P(B)+P(B)-P(A)\cdot P(B)
+  \end{equation*}
+  \begin{equation*}
+    P(A)+P(B)-2(P(A)\cdot P(B))
+  \end{equation*}
+  \begin{equation*}
+    P((A\cap B^{\textbf{c}})\cup (A^{\textbf{c}}\cap B))=0.99+0.95-2(0.99*0.95)=0.059=5.9\%
+  \end{equation*}
+
+  Para resolver (b) se debe encontrar la probabilidad de que ninguno de los indicadores \textit{A} ni \textit{B} se accione, es decir, la probabilidad de que ambos sucesos no ocurran:
+
+  \begin{equation*}
+    P(A^{\textbf{c}}\cap B^{\textbf{c}})
+  \end{equation*}
+  \begin{equation*}
+    P(A^{\textbf{c}})\cdot P(B^{\textbf{c}})
+  \end{equation*}
+  \begin{equation*}
+    (1-P(A))(1-P(B))
+  \end{equation*}
+  \begin{equation*}
+    P(A^{\textbf{c}}\cap B^{\textbf{c}})=(1-0.99)(1-0.95)=0.01*0.05=0.0005=0.05\%
+  \end{equation*}
+
+\end{proof}
+
+\subsection{Ejercicio \#2}
+
+\subsubsection{Enunciado}
+
+De un grupo de \(300\) estudiantes, \(180\) estudian peluquería, \(120\) estética y \(70\) ambos. Si seleccionamos un estudiante al azar.
+\begin{itemize}
+  \item [a)] ¿Cuál es la probabilidad de que estudie estética o peluquería?
+  \item [b)] ¿Cuál es la probabilidad de que estudie solo peluquería?
+\end{itemize}
+
+\subsubsection{Solución}
+
+En este caso tenemos totales de una población, y queremos saber la probabilidad de que una muestra tenga ciertas características:
+
+\begin{proof}
+
+  \begin{equation*}
+    P(A = \text{'Estudiante al azar estudia peluquería'})=\frac{180}{300}=\frac{60}{100}=60\%
+  \end{equation*}
+  \begin{equation*}
+    P(B = \text{'Estudiante al azar estudia estética'})=\frac{120}{300}=\frac{40}{100}=40\%
+  \end{equation*}
+  \begin{equation*}
+    P(A\cap B = \text{'Estudiante al azar estudia ambas disciplinas'})=\frac{70}{300}=23.\overline{3}\%
+  \end{equation*}
+
+  Notar que en este caso los sucesos \textit{A} y \textit{B} no son complementarios ni independientes: puede haber estudiantes que no estudien ninguna de las dos disciplinas. De hecho, hay \(180-70=110\) estudiantes que solo estudian peluquería, \(120-70=50\) estudiantes que solo estudian estética, por lo tanto, ambas disciplinas suman \(110+50+70=230\) estudiantes, lo cual deja \(70\) estudiantes con ocupaciones indeterminadas.
+
+  Para resolver (a) se debe hallar la probabilidad de que el estudiante estudie estética o peluquería (es decir, al menos una de las dos disciplinas):
+
+  \begin{equation*}
+    P(A\cup B)=P(A)+P(B)-P(A\cap B)
+  \end{equation*}
+  \begin{equation*}
+    P(A\cup B)=\frac{180}{300}+\frac{120}{300}-\frac{70}{300}=\frac{180+120-70}{300}=\frac{230}{300}=0.7\overline{6}=76.\overline{6}\%
+  \end{equation*}
+
+  Para resolver (b) se debe hallar la posibilidad de que el estudiante estudie solo peluquería:
+
+  \begin{equation*}
+    P(A\cap B^{\textbf{c}})=\frac{180}{300}-\frac{70}{300}=\frac{110}{300}=0.3\overline{6}=36.\overline{6}\%
+  \end{equation*}
+\end{proof}
+
+\subsection{Ejercicio \#3}
+
+\subsubsection{Enunciado}
+
+Un juego consiste en lanzar sucesivas veces un dado hasta que aparezca un seis, en cuyo caso el juego concluye.
+\begin{enumerate}
+  \item[a)] Hallar la probabilidad de que el juego acabe en el primer lanzamiento.
+  \item[b)] Hallar la probabilidad de que acabe exactamente en tres lanzamientos.
+  \item[c)] Hallar la posibilidad de que acabe en menos de siete lanzamientos.
+\end{enumerate}
+
+\subsubsection{Solución}
+
+Un sencillo juego donde cada tirada es independiente de las anteriores:
+
+\begin{proof}
+
+  \begin{equation*}
+    P(A = \text{'Salga seis'})=\frac{1}{6}
+  \end{equation*}
+
+  Para resolver (a), simplemente es la posibilidad de sacar un seis en una tirada
+
+  \begin{equation*}
+    P(A)=\frac{1}{6}=0.1\overline{6}=16.\overline{6}\%
+  \end{equation*}
+
+  Para resolver (b) se necesita calcular la posibilidad de efectuar dos tiradas donde no salga un seis, y una tirada de seis
+
+  \begin{equation*}
+    P(A_1^{\textbf{c}}\cap A_2^{\textbf{c}}\cap A_3)
+  \end{equation*}
+  \begin{equation*}
+    P(A_1^{\textbf{c}})\cdot P(A_2^{\textbf{c}})\cdot P(A_3)
+  \end{equation*}
+  \begin{equation*}
+    (1-P(A_1))\cdot (1-P(A_2))\cdot P(A_3)
+  \end{equation*}
+  \begin{equation*}
+    P(A_1^{\textbf{c}}\cap A_2^{\textbf{c}}\cap A_3)=\frac{1}{6}\cdot (1-\frac{1}{6})^2=\frac{25}{216}=0.115\overline{740}=11.5\overline{740}\%
+  \end{equation*}
+
+  Para resolver (c) se necesita calcular la posibilidad de que el juego acabe en menos de siete lanzamientos, es decir, en como mucho seis lanzamientos. Por supuesto, es más sencillo calcular lo opuesto, es decir, la posibilidad de no sacar un seis en los seis primeros lanzamientos:
+
+  \begin{equation*}
+    P(\text{'El juego acaba en menos de siete lanzamientos'})
+  \end{equation*}
+  \begin{equation*}
+    1-P(\text{'No sacar un seis en seis lanzamientos'})
+  \end{equation*}
+  \begin{equation*}
+    1-P(A^{\textbf{c}})^6
+  \end{equation*}
+  \begin{equation*}
+    1-\left(1-\frac{1}{6}\right)^6=1-\left(\frac{5}{6}\right)^6=1-\frac{15625}{46656}=\frac{31031}{46656}\approx 0.6651=66.51\%
+  \end{equation*}
+
+\end{proof}
+
+\subsection{Ejercicio \#4}
+
+\subsubsection{Enunciado}
+
+La probabilidad de que una mujer viva dentro de \(30\) años es \(0.25\), y la probabilidad de que viva su hijo es \(0.9\). Calcular:
+\begin{enumerate}
+  \item[a)] la probabilidad de que ambos vivan transcurridos los 30 años.
+  \item[b)] probabilidad de que sólo viva el hijo después de 30 años.
+  \item[c)] probabilidad de que sólo viva la madre después de 30 años.
+\end{enumerate}
+
+\subsubsection{Solución}
+
+En este problema nos dan posibilidades basados en un período único de \(30\) años, por lo que se puede obviar dicho dato:
+
+\begin{proof}
+
+  \begin{equation*}
+    P(A = \text{'La madre vive'})=0.25
+  \end{equation*}
+  \begin{equation*}
+    P(B = \text{'El hijo vive'})=0.9
+  \end{equation*}
+
+  Dado que no se especifica lo contrario, ambos sucesos \textit{A} y \textit{B} se asumen independientes.
+
+  Para resolver (a) se debe calcular la posibilidad de que ambos vivan:
+
+  \begin{equation*}
+    P(A\cap B)=P(A)\cdot P(B)=0.25*0.9=0.225=22.5\%
+  \end{equation*}
+
+  Para resolver (b) y (c) es necesario calcular la probabilidad de un de los sucesos \textit{A} y \textit{B} ocurriendo mientras que el otro no ocurre:
+
+  \begin{equation*}
+    P(A^{\textbf{c}}\cap B)=(1-P(A))\cdot P(B)=(1-0.25)*0.9=0.75*0.9=0.675=67.5\%
+  \end{equation*}
+  \begin{equation*}
+    P(A\cap B^{\textbf{c}})=P(A)\cdot (1-P(B))=0.25*(1-0.9)=0.25*0.1=0.025=2.5\%
+  \end{equation*}
+\end{proof}
+
+\subsection{Ejercicio \#5}
+
+\subsubsection{Enunciado}
+
+A un congreso asisten un cierto número de personas, de las que \(85\) hablan castellano, \(45\) Inglés y \(35\) ambos idiomas. Si se escogen dos personas al azar, ¿qué probabilidad hay de que se entiendan?
+
+\subsubsection{Solución}
+
+Este problema plantea una encrucijada, dado que el número total de asistentes \(N\) es desconocido. Del enunciado se puede inferir que dicho valor es el total de personas \(85+45-35=95\) que hablan español, ingles o ambos, dejando fuera la posibilidad de un tercer idioma; para la solución a continuación se eligió este entendimiento.
+
+\begin{proof}
+
+  \begin{equation*}
+    \text{'Personas que hablan castellano'}\,E=85
+  \end{equation*}
+  \begin{equation*}
+    \text{'Personas que hablan ingles'}\,I=45
+  \end{equation*}
+  \begin{equation*}
+    \text{'Personas que hablan ambos idiomas'}\,B=35
+  \end{equation*}
+  \begin{equation*}
+    \text{'Total de asistentes'}\,N=E+I-B=85+45-35=95
+  \end{equation*}
+
+  Luego, las personas que hablan exclusivamente un idioma:
+
+  \begin{equation*}
+    \text{'Personas que hablan solo español'}\,E^{*}=E-B=85-35=50
+  \end{equation*}
+  \begin{equation*}
+    \text{'Personas que hablan solo ingles'}\,I^{*}=I-B=45-35=10
+  \end{equation*}
+
+  Como se escoge una pareja, para que no se entiendan tienen que hablar exclusivamente idiomas contrarios, luego:
+
+  \begin{equation*}
+    \text{'Parejas que no se entienden'}\,P^{*}=E^{*}\cdot I^{*}=50*10=500
+  \end{equation*}
+
+  Para calcular la posibilidad de escoger una de estas parejas, es preciso calcular la cantidad total de parejas:
+
+  \begin{equation*}
+    \text{'Parejas posibles'}\,P=\binom{N}{2}=\frac{N!}{2!(N-2)!}=\frac{95*94*93!}{2!*93!}=\frac{95*94}{2}=4465
+  \end{equation*}
+
+  Finalmente, la posibilidad de escoger una pareja que se pueda entender es:
+
+  \begin{equation*}
+    P((P^{*})^{\textbf{c}})=1-\frac{P^{*}}{P}=1-\frac{500}{4465}\approx0.8880=88.80\%
+  \end{equation*}
+\end{proof}
+
+\subsection{Ejercicio \#6}
+
+\subsubsection{Enunciado}
+
+En un colectivo de inversores bursátiles, el \(20\%\) realiza operaciones vía internet. De los inversores que realizan operaciones vía internet, un \(80\%\) consulta InfoBolsaWeb. De los inversores bursátiles que no realizan operaciones vía internet sólo un \(20\%\) consulta InfoBolsaWeb. Se pide:
+\begin{enumerate}
+  \item[a)] Obtener la probabilidad de que un inversor bursátil elegido al azar en este colectivo consulte InfoBolsaWeb.
+  \item[b)] Si se elige al azar un inversor bursátil de este colectivo y resulta que consulta InfoBolsaWeb, ¿cuál es la probabilidad de que realice operaciones por internet?
+\end{enumerate}
+
+\subsubsection{Solución}
+
+Este problema es diferente de los anteriores, dado que es la primera vez que se presentan sucesos dependientes de forma directa:
+
+\begin{proof}
+
+  \begin{equation*}
+    P(I = \text{'Opera vía internet'})=0.20
+  \end{equation*}
+  \begin{equation*}
+    P(W = \text{'Usa InfoBolsaWeb'}\,|\,I = \text{'Opera vía internet'})=0.80
+  \end{equation*}
+  \begin{equation*}
+    P(W = \text{'Usa InfoBolsaWeb'}\,|\,I^{\textbf{c}} = \text{'No opera vía internet'})=0.20
+  \end{equation*}
+
+  Para resolver (a) es necesario calcular la posibilidad de que un inversor visite la web:
+
+  \begin{equation*}
+    P(W)=P(W|I)P(I)+P(W|I^{\textbf{c}})P(I^{\textbf{c}})
+  \end{equation*}
+  \begin{equation*}
+    P(W|I)P(I)+P(W|I^{\textbf{c}})(1-P(I))
+  \end{equation*}
+  \begin{equation*}
+    P(W)=0.80*0.20+0.20*(1-0.20)=2*0.80*0.20=0.32=32\%
+  \end{equation*}
+
+  Para resolver (b) es necesario calcular la posibilidad de que, sabiendo que consulta InfoBolsaWeb, opere vía internet:
+
+  \begin{equation*}
+    P(I|W)=\frac{P(W|I)\cdot P(I)}{P(W)}
+  \end{equation*}
+  \begin{equation*}
+    P(I|W)=\frac{0.80*0.20}{0.32}=0.5=50\%
+  \end{equation*}
+\end{proof}
+
+\end{document}
