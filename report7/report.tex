@@ -1,0 +1,53 @@
+% Copyright 2026 MarcosHCK
+%
+\documentclass[12pt,a4paper]{article}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{changepage}
+\usepackage{hyperref}
+\usepackage{bookmark} % must load after hyperref
+\usepackage{cleveref} % must load after hyperref
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage[utf8]{inputenc}
+\usepackage{indentfirst}
+\usepackage{polyglossia} % languages set below via \setmainlanguage/\setotherlanguage
+\usepackage{setspace}
+\usepackage[dvipsnames]{xcolor}
+
+\setmainlanguage{spanish}
+\setotherlanguage{english}
+
+\setstretch{1.5}
+
+\def\mathdefault#1{#1}
+\newcommand{\myeoch}{\pagebreak}
+
+\providecolor{Aquamarine}{rgb}{0.498, 1, 0.83}
+\providecolor{DarkAquamarine}{rgb}{0.18, 0.55, 0.34}
+\providecolor{YellowOrange}{rgb}{1, 0.7, 0}
+\newcommand\myshade{85}
+\colorlet{mycitecolor}{YellowOrange}
+\colorlet{mylinkcolor}{violet}
+\colorlet{myurlcolor}{DarkAquamarine}
+
+\hypersetup {
+    colorlinks = true,
+    citecolor  = mycitecolor!\myshade!black,
+    linkcolor  = mylinkcolor!\myshade!black,
+    urlcolor   = myurlcolor!\myshade!black,
+  }
+
+\begin{document}
+
+\begin{titlepage}
+
+  \centering
+  {\huge\bfseries Reporte \#6 --- Parte 1\par}
+	{\Large Autor: \itshape Marcos Antonio Pérez Lorenzo\par}
+\end{titlepage}
+
+\pagebreak
+
+\end{document}
