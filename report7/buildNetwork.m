@@ -1,7 +1,6 @@
 function network = buildNetwork(N)
-%BUILDNETWORK Create an N-input/N-output, single-layer ReLU network.
-% Capped ReLU limits activations to [0, 1], then y = 2*x - 1 scales them
-% to the output range [-1, 1].
+%BUILDNETWORK Create an N-input/N-output network with a 2N-unit hidden layer.
+% The hidden layer uses tanh; the output uses capped ReLU scaled to [-1, 1].
 
 if ~isnumeric(N) || ~isreal(N) || ~isscalar(N) || ...
         isnan(N) || isinf(N) || N < 1 || N ~= floor(N)
@@ -11,8 +10,12 @@ end
 % changing the caller's random-number generator state.
 previousRngState = rng;
 rng(1, 'twister');
-network.weights = 0.01 * randn(N, N);
+network.hiddenUnits = 2 * N;
+network.inputHiddenWeights = sqrt(2 / N) * randn(N, network.hiddenUnits);
+network.hiddenOutputWeights = sqrt(1 / network.hiddenUnits) * ...
+    randn(network.hiddenUnits, N);
 rng(previousRngState);
-network.bias = 0.5 * ones(1, N);
+network.hiddenBias = zeros(1, network.hiddenUnits);
+network.outputBias = 0.5 * ones(1, N);
 network.N = N;
 end

@@ -11,3 +11,7 @@
 *.pdf
 *.run.xml
 *.synctex.gz
+
+/svg-inkscape/**/*
+/reconstruction.svg
+/trainingrmse.svg

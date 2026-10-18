@@ -10,6 +10,7 @@
 \usepackage{cleveref} % must load after hyperref
 \usepackage{float}
 \usepackage{graphicx}
+\usepackage{svg}
 \usepackage[utf8]{inputenc}
 \usepackage{indentfirst}
 \usepackage{polyglossia} % languages set below via \setmainlanguage/\setotherlanguage
@@ -44,10 +45,98 @@
 \begin{titlepage}
 
   \centering
-  {\huge\bfseries Reporte \#6 --- Parte 1\par}
+  {\huge\bfseries Reporte \#7\par}
 	{\Large Autor: \itshape Marcos Antonio Pérez Lorenzo\par}
 \end{titlepage}
 
 \pagebreak
+
+\section{Red neuronal para reconstruir señales senoidales}
+
+El programa \texttt{network.m} entrena una red neuronal para reconstruir una señal senoidal a partir de sus muestras envueltas. La envoltura limita cada muestra de entrada a un intervalo de amplitud menor, mientras que el objetivo conserva la señal original. Después del entrenamiento, la red se evalúa con ondas de fases que no se incluyeron en los ejemplos de entrenamiento.
+
+\subsection{Generación de los datos}
+
+El programa utiliza \(N=32\) muestras por onda, una frecuencia de \(1\,\text{Hz}\), una duración de \(2\,\text{s}\) y un umbral de envoltura \(\tau=0.5\). En ese intervalo la señal completa dos ciclos, por lo que se asignan nominalmente \(16\) muestras a cada ciclo. El tiempo se divide en \(N\) puntos equidistantes. Para el entrenamiento se construyen \(256\) ondas senoidales con fases iniciales distribuidas uniformemente entre cero y un ciclo completo:
+\begin{equation*}
+  x_{k,j}=\sin\!\left(2\pi f t_j+\phi_k\right),
+  \qquad
+  \phi_k=2\pi\frac{k-1}{256},
+  \qquad k=1,\ldots,256.
+\end{equation*}
+Cada onda original se transforma en una entrada envuelta mediante
+\begin{equation*}
+  u_{k,j}=\operatorname{mod}\!\left(x_{k,j}+\tau,\,2\tau\right)-\tau,
+\end{equation*}
+de modo que las entradas quedan en el intervalo \([-0.5,0.5)\). Cada fila de la matriz de entrada contiene una onda envuelta y la fila correspondiente de objetivos contiene sus muestras originales.
+
+\subsection{Arquitectura de la red}
+
+La red es totalmente conectada y tiene \(N=32\) entradas, una capa oculta de \(2N=64\) neuronas y \(N=32\) salidas. Para una fila \(\mathbf{u}\) de muestras envueltas, la capa oculta calcula
+\begin{equation*}
+  \mathbf{h}=\tanh\!\left(\mathbf{u}\mathbf{W}_1+\mathbf{b}_1\right),
+  \qquad \mathbf{W}_1\in\mathbb{R}^{N\times 2N},
+  \quad \mathbf{b}_1\in\mathbb{R}^{2N}.
+\end{equation*}
+La capa de salida aplica una transformación lineal seguida de una ReLU limitada a \([0,1]\) y escalada al intervalo \([-1,1]\):
+\begin{equation*}
+  \mathbf{z}_2=\mathbf{h}\mathbf{W}_2+\mathbf{b}_2,
+  \qquad \mathbf{W}_2\in\mathbb{R}^{2N\times N},
+  \quad \mathbf{b}_2\in\mathbb{R}^{N},
+\end{equation*}
+\begin{equation*}
+  g(z)=2\min\!\left(1,\max(0,z)\right)-1
+  =\begin{cases}
+    -1, & z\leq 0,\\
+    2z-1, & 0<z<1,\\
+    1, & z\geq 1.
+  \end{cases}
+\end{equation*}
+La tangente hiperbólica de la capa oculta introduce una no linealidad suave; la salida queda acotada entre \(-1\) y \(1\), como la señal objetivo.
+
+\subsection{Organización y entrenamiento}
+
+El archivo \texttt{buildNetwork.m} valida el tamaño de la red e inicializa sus pesos de forma reproducible; los sesgos ocultos comienzan en cero y los sesgos de salida en \(0.5\). El estado del generador aleatorio del usuario se restaura tras la inicialización. El archivo \texttt{trainReconstructionNetwork.m} entrena con una tasa de aprendizaje de \(0.7\), un máximo de \(16000\) épocas y descenso por gradiente en lotes sobre el error cuadrático medio. En cada época calcula las predicciones del conjunto de entrenamiento y actualiza los parámetros mediante retropropagación. El gradiente atraviesa la tangente hiperbólica oculta según \(1-\tanh^2(z)\), y atraviesa la activación de salida solo cuando su entrada está estrictamente entre cero y uno.
+
+\subsection{Parada temprana}
+
+Además de los \(256\) ejemplos de entrenamiento, el programa genera \(256\) ejemplos de validación, cuyas fases se sitúan a un tercio del intervalo entre fases de entrenamiento. Al final de cada época calcula el RMSE de validación. Si este valor no mejora al menos \(10^{-6}\) durante \(500\) épocas consecutivas, el entrenamiento se detiene. Se permite un máximo de \(16000\) épocas y se restauran los pesos y sesgos correspondientes a la época con el mejor RMSE de validación. Este criterio utiliza la validación para seleccionar el punto de parada, no el conjunto de verificación final.
+
+Al finalizar el entrenamiento, el programa calcula la raíz del error cuadrático medio (RMSE) sobre los ejemplos de entrenamiento. El archivo \texttt{applyNetwork.m} aplica la misma transformación a una o varias ondas nuevas.
+
+\subsection{Verificación}
+
+Para la evaluación final se generan otras \(256\) ondas, que no intervienen ni en la actualización de los pesos ni en la parada temprana. Sus fases se sitúan a dos tercios del intervalo entre fases de entrenamiento. Los conjuntos de validación y verificación usan offsets distintos y, por tanto, fases separadas:
+\begin{equation*}
+  \psi_k=2\pi\frac{k-1+\frac{2}{3}}{256},
+  \qquad k=1,\ldots,256.
+\end{equation*}
+Las entradas se envuelven con el mismo umbral que los datos de entrenamiento. Con el mejor modelo seleccionado en la validación, se reconstruyen las ondas reservadas y se calcula un único RMSE sobre todas sus muestras:
+\begin{equation*}
+  \operatorname{RMSE}_{\mathrm{verificación}}
+  =\sqrt{\frac{1}{256N}\sum_{k=1}^{256}\sum_{j=1}^{N}
+    (\widehat{x}_{k,j}-x_{k,j})^2}.
+\end{equation*}
+La figura muestra una de estas ondas de verificación junto a su entrada envuelta y la reconstrucción. El archivo \texttt{network.m} exporta esta gráfica en formato vectorial SVG como \texttt{reconstruction.svg}.
+
+\subsection{Resultados}
+
+Con \(N=32\), el entrenamiento alcanzó el límite de \(16000\) épocas sin activar la parada temprana. El mejor punto de validación se obtuvo en la época \(15999\), con un RMSE de validación de \(0.049730\). Sobre el modelo restaurado de ese punto, el RMSE de entrenamiento fue \(0.013401\) y el RMSE de verificación final fue \(0.017346\), calculado sobre \(256\) ondas reservadas. La figura de error muestra la evolución del RMSE de entrenamiento durante las épocas ejecutadas y señala la época del mejor punto de validación.
+
+\begin{figure}[H]
+  \centering
+  \includesvg[width=0.9\textwidth]{reconstruction}
+  \caption{Ejemplo de verificación: señal original, muestras envueltas y reconstrucción de la red.}
+  \label{fig:reconstruction}
+\end{figure}
+
+El conjunto de verificación está separado del entrenamiento en cuanto a sus fases, aunque ambos conjuntos usan la misma frecuencia, duración, umbral y muestreo. Por ello, el RMSE de verificación mide la reconstrucción de fases intermedias bajo estas condiciones y no demuestra por sí solo la generalización a otras frecuencias, duraciones o configuraciones.
+
+\begin{figure}[H]
+  \centering
+  \includesvg[width=0.9\textwidth]{trainingrmse}
+  \caption{RMSE de entrenamiento por época; el marcador identifica la época con mejor RMSE de validación.}
+  \label{fig:training-rmse}
+\end{figure}
 
 \end{document}

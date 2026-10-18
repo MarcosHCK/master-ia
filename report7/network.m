@@ -1,20 +1,22 @@
 % NETWORK.M
-% Train a single-layer neural network to reconstruct sine waves from their
-% wrapped samples, then plot the reconstruction for one sine wave.
+% Train a two-layer neural network to reconstruct sine waves from their
+% wrapped samples, verify on unseen phases, and export a verification plot.
 % Change N, frequencyHz, durationSeconds, and wrapThreshold as desired.
-% The output uses capped ReLU ([0,1]) followed by 2*x - 1.
+% The hidden layer uses tanh; capped ReLU maps outputs to [-1, 1].
 
 clear;
 clc;
 
 %% Configurable signal and network parameters
-N = 64;                    % Samples/inputs/outputs per wave
+N = 32;                     % Samples/inputs/outputs per wave
 frequencyHz = 1;            % Sine-wave frequency in hertz
 durationSeconds = 2;        % Duration represented by each wave
-wrapThreshold = 0.5;         % Wrapped inputs lie in [-threshold, threshold)
-numTrainingExamples = 64;   % Sine waves with different starting phases
-learningRate = 0.2;
-maxEpochs = 3000;
+wrapThreshold = 0.5;        % Wrapped inputs lie in [-threshold, threshold)
+numTrainingExamples = 256;  % Sine waves with different starting phases
+learningRate = 0.7;
+maxEpochs = 4000 * 4;
+earlyStoppingPatience = 500;
+minimumValidationImprovement = 1e-6;
 
 if ~isscalar(N) || isnan(N) || isinf(N) || N < 2 || N ~= floor(N)
     error('N must be an integer greater than or equal to 2.');
@@ -50,23 +52,63 @@ for example = 1:numTrainingExamples
     originalTrainingTargets(example, :) = originalWave;
 end
 
+%% Build separate validation and verification pairs between training phases
+numValidationExamples = numTrainingExamples;
+numVerificationExamples = numTrainingExamples;
+wrappedValidationInputs = zeros(numValidationExamples, N);
+originalValidationTargets = zeros(numValidationExamples, N);
+wrappedVerificationInputs = zeros(numVerificationExamples, N);
+originalVerificationTargets = zeros(numVerificationExamples, N);
+
+for example = 1:numValidationExamples
+    phase = 2 * pi * (example - 1 + 1 / 3) / numTrainingExamples;
+    originalWave = sin(2 * pi * frequencyHz * timeSeconds + phase);
+    wrappedWave = mod(originalWave + wrapThreshold, 2 * wrapThreshold) - wrapThreshold;
+    wrappedValidationInputs(example, :) = wrappedWave;
+    originalValidationTargets(example, :) = originalWave;
+end
+
+for example = 1:numVerificationExamples
+    phase = 2 * pi * (example - 1 + 2 / 3) / numTrainingExamples;
+    originalWave = sin(2 * pi * frequencyHz * timeSeconds + phase);
+    wrappedWave = mod(originalWave + wrapThreshold, 2 * wrapThreshold) - wrapThreshold;
+    wrappedVerificationInputs(example, :) = wrappedWave;
+    originalVerificationTargets(example, :) = originalWave;
+end
+
 %% Build and train the configurable N-input/N-output network
 network = buildNetwork(N);
 network = trainReconstructionNetwork(network, wrappedTrainingInputs, ...
-    originalTrainingTargets, learningRate, maxEpochs);
+    originalTrainingTargets, learningRate, maxEpochs, wrappedValidationInputs, ...
+    originalValidationTargets, earlyStoppingPatience, minimumValidationImprovement);
 
-%% Reconstruct the zero-phase sine wave from its N wrapped samples
-originalSignal = sin(2 * pi * frequencyHz * timeSeconds);
-wrappedSignal = mod(originalSignal + wrapThreshold, 2 * wrapThreshold) - wrapThreshold;
-reconstructedSignal = applyNetwork(network, wrappedSignal);
-reconstructionRMSE = sqrt(mean((reconstructedSignal - originalSignal).^2));
+%% Verify on held-out phases and select one for the plot
+verificationPredictions = applyNetwork(network, wrappedVerificationInputs);
+verificationRMSE = sqrt(mean((verificationPredictions(:) - ...
+    originalVerificationTargets(:)).^2));
+verificationExample = 1;
+originalSignal = originalVerificationTargets(verificationExample, :);
+wrappedSignal = wrappedVerificationInputs(verificationExample, :);
+reconstructedSignal = verificationPredictions(verificationExample, :);
 
-fprintf('Network: %d inputs, one dense layer, %d outputs\n', N, N);
-fprintf('Training examples: %d; epochs: %d\n', numTrainingExamples, network.epochs);
-fprintf('Training RMSE: %.6f; plotted-wave RMSE: %.6f\n', ...
-    network.trainingRMSE, reconstructionRMSE);
+fprintf('Network: %d inputs, one hidden layer with %d units, %d outputs\n', ...
+    N, network.hiddenUnits, N);
+fprintf('Training examples: %d; validation examples: %d\n', ...
+    numTrainingExamples, numValidationExamples);
+if network.stoppedEarly
+    earlyStoppingText = 'yes';
+else
+    earlyStoppingText = 'no';
+end
+fprintf('Epochs: %d / %d; best validation epoch: %d; stopped early: %s\n', ...
+    network.epochs, maxEpochs, network.bestEpoch, ...
+    earlyStoppingText);
+fprintf('Best validation RMSE: %.6f\n', network.validationRMSE);
+fprintf('Training RMSE: %.6f\n', network.trainingRMSE);
+fprintf('Verification examples: %d; verification RMSE: %.6f\n', ...
+    numVerificationExamples, verificationRMSE);
 
-%% Plot the target, wrapped input, and network reconstruction
+%% Plot a held-out target, wrapped input, and network reconstruction
 figure;
 plot(timeSeconds, originalSignal, 'k--', 'LineWidth', 1.5);
 hold on;
@@ -76,9 +118,27 @@ hold off;
 grid on;
 xlabel('Time (seconds)');
 ylabel('Amplitude');
-title(sprintf('Sine reconstruction: N = %d, frequency = %.3g Hz', ...
+title(sprintf('Sine verification: N = %d, frequency = %.3g Hz', ...
     N, frequencyHz));
-legend('Original sine', 'Wrapped input', 'Network reconstruction', ...
+legend('Verification target', 'Wrapped input', 'Network reconstruction', ...
     'Location', 'northeast');
 xlim([0, durationSeconds]);
 ylim([-1.1, 1.1]);
+scriptDirectory = fileparts(mfilename('fullpath'));
+svgPath = fullfile(scriptDirectory, 'reconstruction.svg');
+print(gcf, svgPath, '-dsvg');
+
+%% Plot training RMSE across epochs and export it as SVG
+figure;
+plot(network.epochHistory, network.trainingRMSEHistory, 'b-', 'LineWidth', 1.2);
+hold on;
+plot(network.bestEpoch, network.trainingRMSEHistory(network.bestEpoch), ...
+    'ro', 'MarkerFaceColor', 'r');
+hold off;
+grid on;
+xlabel('Epoch');
+ylabel('Training RMSE');
+title('Training RMSE by epoch');
+legend('Training RMSE', 'Best validation checkpoint', 'Location', 'northeast');
+trainingRMSEPath = fullfile(scriptDirectory, 'trainingrmse.svg');
+print(gcf, trainingRMSEPath, '-dsvg');

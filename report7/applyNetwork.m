@@ -1,9 +1,13 @@
 function reconstructedSamples = applyNetwork(network, wrappedSamples)
-%APPLYNETWORK Reconstruct one or more wrapped waves using a trained network.
+%APPLYNETWORK Reconstruct waves using a tanh-hidden, capped-ReLU-output network.
 % Pass one N-value row/vector, or a matrix with one N-value sample per row.
 
 if ~isstruct(network) || ~isfield(network, 'N') || ...
-        ~isfield(network, 'weights') || ~isfield(network, 'bias')
+        ~isfield(network, 'hiddenUnits') || ...
+        ~isfield(network, 'inputHiddenWeights') || ...
+        ~isfield(network, 'hiddenBias') || ...
+        ~isfield(network, 'hiddenOutputWeights') || ...
+        ~isfield(network, 'outputBias')
     error('network must be a model returned by buildNetwork.');
 end
 N = network.N;
@@ -15,13 +19,18 @@ if ~isnumeric(wrappedSamples) || ~isreal(wrappedSamples) || ...
         any(isnan(wrappedSamples(:))) || any(isinf(wrappedSamples(:)))
     error('wrappedSamples must be a finite vector or matrix with N columns.');
 end
-if ~isequal(size(network.weights), [N, N]) || numel(network.bias) ~= N
-    error('The network weights or bias do not match network.N.');
+hiddenUnits = network.hiddenUnits;
+if ~isequal(size(network.inputHiddenWeights), [N, hiddenUnits]) || ...
+        numel(network.hiddenBias) ~= hiddenUnits || ...
+        ~isequal(size(network.hiddenOutputWeights), [hiddenUnits, N]) || ...
+        numel(network.outputBias) ~= N
+    error('The network parameters do not match its input, hidden, and output sizes.');
 end
 
-linearOutput = wrappedSamples * network.weights + ...
-    repmat(reshape(network.bias, 1, N), size(wrappedSamples, 1), 1);
-reluOutput = max(0, linearOutput);
-cappedReluOutput = min(1, reluOutput);
-reconstructedSamples = 2 * cappedReluOutput - 1;
+hiddenLinear = wrappedSamples * network.inputHiddenWeights + ...
+    repmat(reshape(network.hiddenBias, 1, hiddenUnits), size(wrappedSamples, 1), 1);
+hiddenActivations = tanh(hiddenLinear);
+outputLinear = hiddenActivations * network.hiddenOutputWeights + ...
+    repmat(reshape(network.outputBias, 1, N), size(wrappedSamples, 1), 1);
+reconstructedSamples = 2 * min(1, max(0, outputLinear)) - 1;
 end
