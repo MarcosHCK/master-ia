@@ -1,0 +1,77 @@
+% Copyright 2026 MarcosHCK
+%
+\documentclass[12pt,a4paper]{article}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage[utf8]{inputenc}
+\usepackage{indentfirst}
+\usepackage{polyglossia}
+\usepackage{setspace}
+\usepackage{hyperref}
+\setmainlanguage{spanish}
+\setstretch{1.5}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
+
+\begin{document}
+
+\begin{titlepage}
+
+  \centering
+  {\huge\bfseries Reporte \#8\par}
+	{\Large Autor: \itshape Marcos Antonio Pérez Lorenzo\par}
+\end{titlepage}
+
+\pagebreak
+
+\section{Objetivo y alcance}
+
+El programa \texttt{network.m} implementa un primer experimento supervisado que transforma una imagen monocromática de \(16\times16\) píxeles en una cuadrícula de ocupación de \(16\times16\times16\) vóxeles. El tamaño de entrada, la resolución volumétrica y el ancho de la capa oculta se configuran al principio del programa; las dimensiones no dependen unas de otras.
+
+Esta tarea no tiene una solución geométrica única: una sola proyección bidimensional no indica de forma general qué geometría se encuentra detrás de la silueta ni cómo es la cara oculta. Por tanto, la red aprende las regularidades de los sólidos y de la cámara definidos aquí. El resultado es una reconstrucción condicionada por ese prior sintético, no una recuperación garantizada de cualquier objeto real.
+
+\section{Datos sintéticos}
+
+La función \texttt{generateSyntheticData.m} crea cinco clases de sólidos: esferas, elipsoides, prismas rectangulares, cilindros elípticos y conos. Varía sus dimensiones, orientación y posición usando semillas reproducibles. Cada sólido se rasteriza en una cuadrícula cúbica; su imagen es la media de ocupación a lo largo del eje \(z\), redimensionada mediante interpolación bilineal al tamaño de entrada. En consecuencia, la imagen en escala de grises incluye información aproximada sobre la profundidad proyectada, no solamente una silueta binaria.
+
+Cada partición se genera con una semilla independiente: entrenamiento, validación y prueba contienen respectivamente \(384\), \(64\) y \(64\) ejemplos. El tamaño de entrenamiento es cuatro veces mayor que en la primera ejecución (\(96\) ejemplos); se amplían también validación y prueba para que la selección del umbral y la estimación final sean menos sensibles a unos pocos ejemplos. La prueba no se usa durante el ajuste ni para elegir el umbral.
+
+\section{Arquitectura y entrenamiento}
+
+La entrada se aplana en \(N^2\) valores y se centra restando \(0.5\). Una capa oculta ReLU de \(48\) unidades se conecta a una capa de salida sigmoide de \(R^3\) unidades, donde \(R\) es la resolución de la cuadrícula de vóxeles. Para cada vóxel, la salida estima su probabilidad de ocupación:
+\begin{align*}
+  \mathbf{h} &= \operatorname{ReLU}\!\left((\mathbf{x}-0.5)\mathbf{W}_1+\mathbf{b}_1\right),\\
+  \mathbf{p} &= \sigma\!\left(\mathbf{h}\mathbf{W}_2+\mathbf{b}_2\right).
+\end{align*}
+
+El archivo \texttt{trainNetwork.m} implementa retropropagación por lotes pequeños con entropía cruzada binaria, regularización \(L_2\), recorte de gradiente y parada temprana basada en la pérdida de validación. Como sólo alrededor del \(5.5\%\) de los vóxeles de entrenamiento están ocupados, el gradiente y la pérdida ponderan la clase positiva seis veces más que la clase vacía. Esto reduce el incentivo a predecir vacío en casi todo el volumen. Al terminar, \texttt{selectOccupancyThreshold.m} elige, con el conjunto de validación, el umbral entre \(0.01\) y \(0.50\) que maximiza el IoU volumétrico.
+
+\section{Evaluación}
+
+Se informa el IoU volumétrico medio por ejemplo, el IoU de las proyecciones binarias, la exactitud por vóxel y la entropía cruzada. El IoU compara la intersección con la unión de los conjuntos ocupados. La exactitud puede parecer elevada aunque se reconstruya mal la forma, porque la mayoría de los vóxeles está vacía; por ello, no debe interpretarse sin los IoU.
+
+La configuración anterior, con \(96\) ejemplos de entrenamiento y un máximo de \(80\) épocas, sirvió como una línea base rápida para verificar el flujo de trabajo; no se eligió por ser un tamaño óptimo ni porque se hubiera demostrado la convergencia. La configuración ampliada entrenó con \(384\) ejemplos, validó con \(64\), reservó \(64\) para prueba y ejecutó las \(160\) épocas permitidas. La pérdida de entrenamiento ponderada fue \(955.668779\), la de validación \(996.677671\), y la entropía cruzada de prueba sin ponderar \(616.509774\). La validación eligió el umbral \(0.50\), con IoU volumétrico \(0.4468\). Sobre la prueba, el IoU volumétrico fue \(0.4434\), el IoU de silueta \(0.6219\), y la exactitud por vóxel \(0.9409\). En comparación con la primera ejecución, el IoU volumétrico de prueba aumentó de \(0.2332\) a \(0.4434\), aunque las dos particiones de prueba son distintas, por lo que esa diferencia no es un ensayo controlado con ejemplos idénticos. La pérdida de entrenamiento aún bajaba en la época \(160\); el límite ampliado tampoco demuestra que el modelo haya convergido.
+
+La figura muestra el primer ejemplo del conjunto de prueba, su silueta objetivo y la proyección de la forma binarizada predicha. Los archivos \texttt{prediction.obj} y \texttt{target.obj} contienen, respectivamente, la malla inferida y la malla objetivo del mismo ejemplo. Se exportan como superficies mediante \texttt{isosurface} y en formato OBJ.
+
+\begin{figure}[ht]
+  \centering
+  \begin{tabular}{ccc}
+    \includegraphics[width=0.27\textwidth]{test-input.png} &
+    \includegraphics[width=0.27\textwidth]{target-silhouette.png} &
+    \includegraphics[width=0.27\textwidth]{predicted-silhouette.png} \\
+    Entrada monocromática & Proyección objetivo & Proyección predicha
+  \end{tabular}
+  \caption{Ejemplo reservado para prueba. Las proyecciones se muestran para inspección; el objetivo real del modelo es el volumen 3D.}
+\end{figure}
+
+\section{Conclusiones y limitaciones}
+
+El experimento demuestra un flujo reproducible que genera pares de datos, entrena una red neuronal, calcula métricas en un conjunto de prueba separado y exporta una superficie triangular. El IoU muestra que este MLP pequeño sólo recupera parcialmente los volúmenes; no es una solución de reconstrucción de alta calidad. El elevado desequilibrio entre vóxeles ocupados y vacíos también confirma por qué la exactitud global resulta insuficiente.
+
+Como continuación convendría aumentar y diversificar los datos, probar un codificador convolucional 2D con un decodificador 3D, comparar varias vistas, y medir el rendimiento en geometrías y cámaras no vistas. Para pasar a imágenes reales se necesitarían ejemplos emparejados con modelos 3D, calibración y una definición coherente de escala y pose.
+
+\section{Ejecución}
+
+Desde el directorio \texttt{report8}, ejecutar \texttt{network.m} reproduce el entrenamiento y la evaluación. El test de integración reducido está en \texttt{test\_report8.m}. Los archivos generados (modelo MAT, mallas OBJ e imágenes PNG) se guardan en el mismo directorio.
+
+\end{document}
