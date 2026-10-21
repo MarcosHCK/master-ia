@@ -51,6 +51,7 @@ validationLossHistory = zeros(options.maxEpochs, 1);
 bestValidationLoss = Inf;
 epochsWithoutImprovement = 0;
 stoppedEarly = false;
+nextProgressPercent = 5;
 
 for epoch = 1:options.maxEpochs
     shuffledIndices = randperm(trainingCount);
@@ -101,6 +102,17 @@ for epoch = 1:options.maxEpochs
     currentValidationLoss = binaryCrossEntropy(network, validationInputs, ...
         validationTargets, options.positiveClassWeight);
     validationLossHistory(epoch) = currentValidationLoss;
+
+    completedPercent = 100 * epoch / options.maxEpochs;
+    while nextProgressPercent <= 100 && ...
+            completedPercent + 10 * eps(completedPercent) >= nextProgressPercent
+        fprintf(['Training progress: %d%% (epoch %d/%d; ' ...
+            'training BCE %.3f, validation BCE %.3f)\n'], ...
+            nextProgressPercent, epoch, options.maxEpochs, ...
+            trainingLossHistory(epoch), currentValidationLoss);
+        fflush(stdout);
+        nextProgressPercent = nextProgressPercent + 5;
+    end
 
     if currentValidationLoss < bestValidationLoss - options.minImprovement
         bestValidationLoss = currentValidationLoss;

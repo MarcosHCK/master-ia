@@ -51,7 +51,7 @@ Se informa el IoU volumétrico medio por ejemplo, el IoU de las proyecciones bin
 
 La configuración anterior, con \(96\) ejemplos de entrenamiento y un máximo de \(80\) épocas, sirvió como una línea base rápida para verificar el flujo de trabajo; no se eligió por ser un tamaño óptimo ni porque se hubiera demostrado la convergencia. La configuración ampliada entrenó con \(384\) ejemplos, validó con \(64\), reservó \(64\) para prueba y ejecutó las \(160\) épocas permitidas. La pérdida de entrenamiento ponderada fue \(955.668779\), la de validación \(996.677671\), y la entropía cruzada de prueba sin ponderar \(616.509774\). La validación eligió el umbral \(0.50\), con IoU volumétrico \(0.4468\). Sobre la prueba, el IoU volumétrico fue \(0.4434\), el IoU de silueta \(0.6219\), y la exactitud por vóxel \(0.9409\). En comparación con la primera ejecución, el IoU volumétrico de prueba aumentó de \(0.2332\) a \(0.4434\), aunque las dos particiones de prueba son distintas, por lo que esa diferencia no es un ensayo controlado con ejemplos idénticos. La pérdida de entrenamiento aún bajaba en la época \(160\); el límite ampliado tampoco demuestra que el modelo haya convergido.
 
-La figura muestra el primer ejemplo del conjunto de prueba, su silueta objetivo y la proyección de la forma binarizada predicha. Los archivos \texttt{prediction.obj} y \texttt{target.obj} contienen, respectivamente, la malla inferida y la malla objetivo del mismo ejemplo. Se exportan como superficies mediante \texttt{isosurface} y en formato OBJ.
+Las tres imágenes siguientes presentan el mismo ejemplo reservado desde distintas etapas: la imagen de entrada en escala de grises que recibe la red, la silueta binaria del objetivo y la silueta de la predicción binarizada. Las dos siluetas se muestran para comparar la proyección; la entrada real de la red sigue siendo la imagen en escala de grises.
 
 \begin{figure}[ht]
   \centering
@@ -59,9 +59,17 @@ La figura muestra el primer ejemplo del conjunto de prueba, su silueta objetivo 
     \includegraphics[width=0.27\textwidth]{test-input.png} &
     \includegraphics[width=0.27\textwidth]{target-silhouette.png} &
     \includegraphics[width=0.27\textwidth]{predicted-silhouette.png} \\
-    Entrada monocromática & Proyección objetivo & Proyección predicha
+    Entrada monocromática & Silueta objetivo & Silueta predicha
   \end{tabular}
-  \caption{Ejemplo reservado para prueba. Las proyecciones se muestran para inspección; el objetivo real del modelo es el volumen 3D.}
+  \caption{Imagen de entrada, proyección binaria del volumen objetivo y proyección binaria del volumen reconstruido.}
+\end{figure}
+
+La figura siguiente compara, para ese mismo ejemplo, las mallas de la forma objetivo y de la predicción desde una vista isométrica. Se usa el mismo ángulo de cámara y escala para ambos modelos; los paneles se colocan con una separación reducida para facilitar su comparación. Los archivos \texttt{prediction.obj} y \texttt{target.obj} contienen las mallas triangulares exportadas, que también se pueden inspeccionar en un visor 3D.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.95\textwidth]{voxel-comparison.png}
+  \caption{Vista isométrica del volumen objetivo (izquierda, azul) y del volumen reconstruido (derecha, naranja), para el primer ejemplo del conjunto de prueba reservado.}
 \end{figure}
 
 \section{Conclusiones y limitaciones}

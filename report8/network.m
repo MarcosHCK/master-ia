@@ -11,14 +11,14 @@ addpath(scriptDirectory);
 %% Configurable experiment parameters
 config.inputSize = 16;
 config.voxelResolution = 16;
-config.hiddenUnits = 48;
-config.trainingExamples = 384;
-config.validationExamples = 64;
-config.testExamples = 64;
-config.batchSize = 24;
-config.learningRate = 0.001;
-config.maxEpochs = 160;
-config.patience = 25;
+config.hiddenUnits = 96;
+config.trainingExamples = 510;
+config.validationExamples = 85;
+config.testExamples = 85;
+config.batchSize = 32;
+config.learningRate = 0.003;
+config.maxEpochs = 3000;
+config.patience = 30;
 config.minImprovement = 1e-4;
 config.weightDecay = 1e-5;
 config.maxGradientNorm = 10;
@@ -81,11 +81,16 @@ inputImagePath = fullfile(scriptDirectory, 'test-input.png');
 imwrite(sampleImage, inputImagePath);
 targetSilhouettePath = fullfile(scriptDirectory, 'target-silhouette.png');
 predictedSilhouettePath = fullfile(scriptDirectory, 'predicted-silhouette.png');
+voxelComparisonPath = fullfile(scriptDirectory, 'voxel-comparison.png');
 imwrite(any(targetVolume, 3), targetSilhouettePath);
 imwrite(any(predictedVolume >= config.occupancyThreshold, 3), predictedSilhouettePath);
+renderVoxelComparisonFigure(targetVolume, predictedVolume, voxelComparisonPath, ...
+    config.occupancyThreshold);
 fprintf(['Example input: %s\nTarget silhouette: %s\nPredicted silhouette: %s\n' ...
+    'Isometric target/prediction comparison: %s\n' ...
     'Predicted mesh: %s\nTarget mesh: %s\n'], inputImagePath, ...
-    targetSilhouettePath, predictedSilhouettePath, predictedMeshPath, targetMeshPath);
+    targetSilhouettePath, predictedSilhouettePath, voxelComparisonPath, ...
+    predictedMeshPath, targetMeshPath);
 
 trainingHistory = struct('epoch', network.epochHistory, ...
     'trainingBCE', network.trainingLossHistory, ...

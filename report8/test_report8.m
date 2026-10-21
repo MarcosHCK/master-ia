@@ -11,14 +11,20 @@ assert(all((targets(:) == 0) | (targets(:) == 1)));
 
 network = buildNetwork(7, 8, 10, mean(targets(:)), 11);
 options.learningRate = 0.001;
-options.maxEpochs = 3;
+options.maxEpochs = 20;
 options.batchSize = 3;
-options.patience = 3;
+options.patience = 30;
 options.seed = 12;
-network = trainNetwork(network, inputs(1:4, :), targets(1:4, :), ...
-    inputs(5:6, :), targets(5:6, :), options);
+trainingOutput = evalc('network = trainNetwork(network, inputs(1:4, :), targets(1:4, :), inputs(5:6, :), targets(5:6, :), options);');
 assert(network.epochs >= 1 && network.epochs <= options.maxEpochs);
 assert(isfinite(network.validationLoss));
+progressLines = regexp(trainingOutput, 'Training progress: [^\n]+', 'match');
+assert(numel(progressLines) == 20);
+for progressPercent = 5:5:100
+    expectedProgressMessage = sprintf('Training progress: %d%% (epoch %d/20;', ...
+        progressPercent, progressPercent / 5);
+    assert(~isempty(strfind(trainingOutput, expectedProgressMessage)));
+end
 
 singlePrediction = applyNetwork(network, reshape(inputs(5, :), 7, 7));
 batchPredictions = applyNetwork(network, inputs(5:6, :));
@@ -45,4 +51,12 @@ meshInfo = dir(meshPath);
 assert(meshInfo.bytes > 0);
 delete(meshPath);
 
-fprintf('report8 smoke tests passed (synthetic data, training, inference, metrics, OBJ export).\n');
+figurePath = [tempname(), '.png'];
+renderVoxelComparisonFigure(cube, cube, figurePath, 0.5);
+assert(exist(figurePath, 'file') == 2);
+figureInfo = dir(figurePath);
+assert(figureInfo.bytes > 0);
+delete(figurePath);
+
+fprintf(['report8 smoke tests passed (synthetic data, training, inference, ' ...
+    'metrics, mesh export, isometric figure).\n']);
