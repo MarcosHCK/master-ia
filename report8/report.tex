@@ -25,7 +25,7 @@
 
 \section{Objetivo y alcance}
 
-El programa \texttt{network.m} implementa un primer experimento supervisado que transforma una imagen monocromática de \(16\times16\) píxeles en una cuadrícula de ocupación de \(16\times16\times16\) vóxeles. El tamaño de entrada, la resolución volumétrica y el ancho de la capa oculta se configuran al principio del programa; las dimensiones no dependen unas de otras.
+El proyecto transforma una imagen monocromática de \(16\times16\) píxeles en una cuadrícula de ocupación de \(16\times16\times16\) vóxeles. El tamaño de entrada, la resolución volumétrica y el ancho de la capa oculta son configurables. La ejecución se divide en tres etapas independientes: generar los ejemplos, entrenar y guardar los pesos, y aplicar los pesos guardados a una imagen nueva.
 
 Esta tarea no tiene una solución geométrica única: una sola proyección bidimensional no indica de forma general qué geometría se encuentra detrás de la silueta ni cómo es la cara oculta. Por tanto, la red aprende las regularidades de los sólidos y de la cámara definidos aquí. El resultado es una reconstrucción condicionada por ese prior sintético, no una recuperación garantizada de cualquier objeto real.
 
@@ -33,23 +33,25 @@ Esta tarea no tiene una solución geométrica única: una sola proyección bidim
 
 La función \texttt{generateSyntheticData.m} crea cinco clases de sólidos: esferas, elipsoides, prismas rectangulares, cilindros elípticos y conos. Varía sus dimensiones, orientación y posición usando semillas reproducibles. Cada sólido se rasteriza en una cuadrícula cúbica; su imagen es la media de ocupación a lo largo del eje \(z\), redimensionada mediante interpolación bilineal al tamaño de entrada. En consecuencia, la imagen en escala de grises incluye información aproximada sobre la profundidad proyectada, no solamente una silueta binaria.
 
-Cada partición se genera con una semilla independiente: entrenamiento, validación y prueba contienen respectivamente \(384\), \(64\) y \(64\) ejemplos. El tamaño de entrenamiento es cuatro veces mayor que en la primera ejecución (\(96\) ejemplos); se amplían también validación y prueba para que la selección del umbral y la estimación final sean menos sensibles a unos pocos ejemplos. La prueba no se usa durante el ajuste ni para elegir el umbral.
+El programa \texttt{generate\_examples.m} genera y guarda las particiones en \texttt{examples.mat}. Con la configuración predeterminada, entrenamiento, validación y prueba contienen respectivamente \(510\), \(85\) y \(85\) ejemplos, cada partición con una semilla independiente. Los ejemplos incluyen tanto las imágenes como sus volúmenes objetivo. El archivo guardado permite volver a entrenar sin regenerar los ejemplos; el usuario puede modificar en el script el tamaño, el número de ejemplos y la semilla.
 
 \section{Arquitectura y entrenamiento}
 
-La entrada se aplana en \(N^2\) valores y se centra restando \(0.5\). Una capa oculta ReLU de \(48\) unidades se conecta a una capa de salida sigmoide de \(R^3\) unidades, donde \(R\) es la resolución de la cuadrícula de vóxeles. Para cada vóxel, la salida estima su probabilidad de ocupación:
+La entrada se aplana en \(N^2\) valores y se centra restando \(0.5\). Una capa oculta ReLU de \(96\) unidades se conecta a una capa de salida sigmoide de \(R^3\) unidades, donde \(R\) es la resolución de la cuadrícula de vóxeles. Para cada vóxel, la salida estima su probabilidad de ocupación:
 \begin{align*}
   \mathbf{h} &= \operatorname{ReLU}\!\left((\mathbf{x}-0.5)\mathbf{W}_1+\mathbf{b}_1\right),\\
   \mathbf{p} &= \sigma\!\left(\mathbf{h}\mathbf{W}_2+\mathbf{b}_2\right).
 \end{align*}
 
-El archivo \texttt{trainNetwork.m} implementa retropropagación por lotes pequeños con entropía cruzada binaria, regularización \(L_2\), recorte de gradiente y parada temprana basada en la pérdida de validación. Como sólo alrededor del \(5.5\%\) de los vóxeles de entrenamiento están ocupados, el gradiente y la pérdida ponderan la clase positiva seis veces más que la clase vacía. Esto reduce el incentivo a predecir vacío en casi todo el volumen. Al terminar, \texttt{selectOccupancyThreshold.m} elige, con el conjunto de validación, el umbral entre \(0.01\) y \(0.50\) que maximiza el IoU volumétrico.
+El programa \texttt{train\_network.m} carga \texttt{examples.mat}, entrena la red y escribe \texttt{trained-network.mat}. El entrenamiento usa mini lotes, entropía cruzada binaria, regularización \(L_2\), recorte de gradiente y parada temprana sobre la pérdida de validación. Como sólo una pequeña fracción de los vóxeles está ocupada, la pérdida pondera esa clase seis veces más que la clase vacía. Al terminar, se elige con validación el umbral de ocupación que maximiza el IoU volumétrico.
+
+El archivo de pesos contiene los parámetros de la red y los metadatos necesarios para inferencia: tamaño esperado de imagen, resolución volumétrica y umbral de ocupación. Guarda también un resumen de entrenamiento, pero no incluye los ejemplos. Por tanto, la inferencia puede ejecutarse posteriormente sin el conjunto de entrenamiento ni el archivo \texttt{examples.mat}.
 
 \section{Evaluación}
 
 Se informa el IoU volumétrico medio por ejemplo, el IoU de las proyecciones binarias, la exactitud por vóxel y la entropía cruzada. El IoU compara la intersección con la unión de los conjuntos ocupados. La exactitud puede parecer elevada aunque se reconstruya mal la forma, porque la mayoría de los vóxeles está vacía; por ello, no debe interpretarse sin los IoU.
 
-La configuración anterior, con \(96\) ejemplos de entrenamiento y un máximo de \(80\) épocas, sirvió como una línea base rápida para verificar el flujo de trabajo; no se eligió por ser un tamaño óptimo ni porque se hubiera demostrado la convergencia. La configuración ampliada entrenó con \(384\) ejemplos, validó con \(64\), reservó \(64\) para prueba y ejecutó las \(160\) épocas permitidas. La pérdida de entrenamiento ponderada fue \(955.668779\), la de validación \(996.677671\), y la entropía cruzada de prueba sin ponderar \(616.509774\). La validación eligió el umbral \(0.50\), con IoU volumétrico \(0.4468\). Sobre la prueba, el IoU volumétrico fue \(0.4434\), el IoU de silueta \(0.6219\), y la exactitud por vóxel \(0.9409\). En comparación con la primera ejecución, el IoU volumétrico de prueba aumentó de \(0.2332\) a \(0.4434\), aunque las dos particiones de prueba son distintas, por lo que esa diferencia no es un ensayo controlado con ejemplos idénticos. La pérdida de entrenamiento aún bajaba en la época \(160\); el límite ampliado tampoco demuestra que el modelo haya convergido.
+Con la configuración guardada, el entrenamiento usó \(510\) ejemplos, validó con \(85\), reservó \(85\) para la prueba, y permitió hasta \(3000\) épocas, con lotes de \(32\) ejemplos y una tasa de aprendizaje de \(0.003\). La parada temprana se activó en la época \(2084\), y se restauró el mejor punto de validación, de la época \(2054\). La entropía cruzada ponderada fue \(484.2085\) para entrenamiento y \(568.9272\) para validación; la validación obtuvo un IoU volumétrico de \(0.5943\). En la prueba, la entropía cruzada sin ponderar fue \(322.2718\), el IoU volumétrico \(0.5893\), el IoU de silueta \(0.8278\) y la exactitud por vóxel \(0.9663\). Estos valores describen el conjunto sintético reservado y la semilla registrada; no deben interpretarse como una garantía de reconstrucción de objetos reales.
 
 Las tres imágenes siguientes presentan el mismo ejemplo reservado desde distintas etapas: la imagen de entrada en escala de grises que recibe la red, la silueta binaria del objetivo y la silueta de la predicción binarizada. Las dos siluetas se muestran para comparar la proyección; la entrada real de la red sigue siendo la imagen en escala de grises.
 
@@ -80,6 +82,12 @@ Como continuación convendría aumentar y diversificar los datos, probar un codi
 
 \section{Ejecución}
 
-Desde el directorio \texttt{report8}, ejecutar \texttt{network.m} reproduce el entrenamiento y la evaluación. El test de integración reducido está en \texttt{test\_report8.m}. Los archivos generados (modelo MAT, mallas OBJ e imágenes PNG) se guardan en el mismo directorio.
+\begin{enumerate}
+  \item Ejecutar \texttt{generate\_examples.m} para crear \texttt{examples.mat}.
+  \item Ejecutar \texttt{train\_network.m} para entrenar usando esos ejemplos. El resultado es \texttt{trained-network.mat}, que contiene los pesos y la configuración de inferencia.
+  \item Para una imagen nueva, indicar su ruta en \texttt{infer\_image.m} y ejecutarlo. También se puede llamar \texttt{inferImage('trained-network.mat', 'mi-imagen.png')}. Esta etapa no genera datos ni vuelve a entrenar; guarda el volumen de probabilidades, la silueta y una malla OBJ en el directorio de salida.
+\end{enumerate}
+
+La evaluación de entrenamiento escribe además las imágenes de comparación y las mallas objetivo/predicha usadas en este informe. La prueba de integración reducida está en \texttt{test\_report8.m}.
 
 \end{document}

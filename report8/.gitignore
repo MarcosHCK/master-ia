@@ -13,10 +13,9 @@
 *.run.xml
 *.synctex.gz
 
-/model.mat
+*.png
+
+/examples.mat
+/trained-network.mat
 /prediction.obj
 /target.obj
-/test-input.png
-/target-silhouette.png
-/predicted-silhouette.png
-/voxel-comparison.png
