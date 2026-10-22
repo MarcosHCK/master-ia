@@ -1,6 +1,5 @@
-function artifactPaths = exportHeldOutArtifacts(network, dataset, outputDirectory, testProbabilities)
-%EXPORTHeldOutArtifacts Export held-out images, silhouettes, 3-D figure, and meshes.
-% This can be run after training to regenerate report outputs from a saved model.
+function artifactPaths = exportHeldOutArtifacts(network, dataset, outputDirectory, testHeights)
+%EXPORTHeldOutArtifacts Export held-out depthmaps, height maps, and surface OBJ files.
 
 if nargin < 3 || isempty(outputDirectory)
     outputDirectory = pwd;
@@ -14,57 +13,43 @@ if exist(outputDirectory, 'dir') ~= 7
         error('Could not create output directory: %s', message);
     end
 end
-requiredDatasetFields = {'testInputs', 'testTargets', 'config'};
+requiredDatasetFields = {'testInputs', 'testTargets'};
 if ~isstruct(dataset) || ~all(isfield(dataset, requiredDatasetFields))
-    error('dataset must contain testInputs, testTargets, and config.');
-end
-requiredNetworkFields = {'inputSize', 'voxelResolution', 'occupancyThreshold'};
-if ~isstruct(network) || ~all(isfield(network, requiredNetworkFields))
-    error('network must contain input/output dimensions and occupancyThreshold.');
+    error('dataset must contain testInputs and testTargets.');
 end
 if size(dataset.testInputs, 2) ~= network.inputSize ^ 2 || ...
         size(dataset.testTargets, 1) ~= size(dataset.testInputs, 1) || ...
-        size(dataset.testTargets, 2) ~= network.voxelResolution ^ 3 || ...
+        size(dataset.testTargets, 2) ~= network.surfaceResolution ^ 2 || ...
         isempty(dataset.testInputs)
     error('The held-out split dimensions do not match the saved network.');
 end
-if nargin < 4 || isempty(testProbabilities)
-    testProbabilities = applyNetwork(network, dataset.testInputs);
+if nargin < 4 || isempty(testHeights)
+    testHeights = applyNetwork(network, dataset.testInputs);
 end
-if ~isequal(size(testProbabilities), size(dataset.testTargets)) || ...
-        any(~isfinite(testProbabilities(:))) || ...
-        any(testProbabilities(:) < 0) || any(testProbabilities(:) > 1)
-    error('testProbabilities must match the held-out targets and lie in [0,1].');
+if ~isequal(size(testHeights), size(dataset.testTargets)) || ...
+        any(~isfinite(testHeights(:))) || ...
+        any(testHeights(:) < 0) || any(testHeights(:) > 1)
+    error('testHeights must match the held-out targets and lie in [0,1].');
 end
 
-inferenceConfig = struct('inputSize', network.inputSize, ...
-    'voxelResolution', network.voxelResolution);
 exampleIndex = 1;
 testImage = reshape(dataset.testInputs(exampleIndex, :), ...
-    inferenceConfig.inputSize, inferenceConfig.inputSize);
-targetVolume = reshape(dataset.testTargets(exampleIndex, :), ...
-    inferenceConfig.voxelResolution, inferenceConfig.voxelResolution, ...
-    inferenceConfig.voxelResolution);
-predictedProbabilityVolume = reshape(testProbabilities(exampleIndex, :), ...
-    inferenceConfig.voxelResolution, inferenceConfig.voxelResolution, ...
-    inferenceConfig.voxelResolution);
-predictedVolume = predictedProbabilityVolume >= network.occupancyThreshold;
-
-artifactPaths.inputImage = fullfile(outputDirectory, 'test-input.png');
-artifactPaths.targetSilhouette = fullfile(outputDirectory, 'target-silhouette.png');
-artifactPaths.predictedSilhouette = fullfile(outputDirectory, 'predicted-silhouette.png');
-artifactPaths.voxelComparison = fullfile(outputDirectory, 'voxel-comparison.png');
-artifactPaths.predictedMesh = fullfile(outputDirectory, 'prediction.obj');
-artifactPaths.targetMesh = fullfile(outputDirectory, 'target.obj');
+    network.inputSize, network.inputSize);
+targetHeightMap = reshape(dataset.testTargets(exampleIndex, :), ...
+    network.surfaceResolution, network.surfaceResolution);
+predictedHeightMap = reshape(testHeights(exampleIndex, :), ...
+    network.surfaceResolution, network.surfaceResolution);
+artifactPaths.inputDepthmap = fullfile(outputDirectory, 'test-input.png');
+artifactPaths.targetHeightmap = fullfile(outputDirectory, 'target-heightmap.png');
+artifactPaths.predictedHeightmap = fullfile(outputDirectory, 'predicted-heightmap.png');
+artifactPaths.predictedSurface = fullfile(outputDirectory, 'prediction.obj');
+artifactPaths.targetSurface = fullfile(outputDirectory, 'target.obj');
 artifactPaths.exampleIndex = exampleIndex;
 
-imwrite(testImage, artifactPaths.inputImage);
-imwrite(any(targetVolume, 3), artifactPaths.targetSilhouette);
-imwrite(any(predictedVolume, 3), artifactPaths.predictedSilhouette);
-renderVoxelComparisonFigure(targetVolume, predictedProbabilityVolume, ...
-    artifactPaths.voxelComparison, network.occupancyThreshold);
-exportVoxelMesh(predictedProbabilityVolume, artifactPaths.predictedMesh, ...
-    network.occupancyThreshold);
-exportVoxelMesh(targetVolume, artifactPaths.targetMesh, 0.5);
-fprintf('Saved held-out comparison images and meshes to %s\n', outputDirectory);
+imwrite(testImage, artifactPaths.inputDepthmap);
+imwrite(targetHeightMap, artifactPaths.targetHeightmap);
+imwrite(predictedHeightMap, artifactPaths.predictedHeightmap);
+exportSurfaceMesh(predictedHeightMap, artifactPaths.predictedSurface);
+exportSurfaceMesh(targetHeightMap, artifactPaths.targetSurface);
+fprintf('Saved held-out depthmaps, height maps, and surfaces to %s\n', outputDirectory);
 end

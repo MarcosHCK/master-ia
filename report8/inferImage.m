@@ -1,13 +1,13 @@
 function result = inferImage(weightsPath, imagePath, outputDirectory)
-%INFERIMAGE Load saved weights and reconstruct one grayscale image as voxels.
-% Example: inferImage('trained-network.mat', 'input.png')
+%INFERIMAGE Reconstruct a 3-D height-field surface from a top-down depthmap.
+% Example: inferImage('trained-network.mat', 'depthmap.png')
 
 scriptDirectory = fileparts(mfilename('fullpath'));
 if nargin < 1 || isempty(weightsPath)
     weightsPath = fullfile(scriptDirectory, 'trained-network.mat');
 end
 if nargin < 2 || isempty(imagePath)
-    error('Pass the path to a grayscale or RGB image as imagePath.');
+    error('Pass the path to a grayscale or RGB depthmap image as imagePath.');
 end
 if nargin < 3 || isempty(outputDirectory)
     outputDirectory = fileparts(imagePath);
@@ -33,21 +33,21 @@ if ~isfield(savedModel, 'network') || ~isfield(savedModel, 'inferenceConfig')
 end
 network = savedModel.network;
 inferenceConfig = savedModel.inferenceConfig;
-if inferenceConfig.inputSize ~= network.inputSize || ...
-        inferenceConfig.voxelResolution ~= network.voxelResolution || ...
-        inferenceConfig.occupancyThreshold ~= network.occupancyThreshold
+if ~isfield(network, 'surfaceResolution') || ...
+        ~isfield(inferenceConfig, 'surfaceResolution')
+    error(['This checkpoint uses the previous voxel-occupancy model. ' ...
+        'Regenerate the dataset and retrain before running surface inference.']);
+end
+if ~isfield(inferenceConfig, 'inputSize') || ...
+        inferenceConfig.inputSize ~= network.inputSize || ...
+        inferenceConfig.surfaceResolution ~= network.surfaceResolution
     error('Saved inference metadata does not match the network parameters.');
 end
 
 sourceImage = readNormalizedGrayscale(imagePath);
 inputImage = resizeGrayscaleImage(sourceImage, inferenceConfig.inputSize, ...
     inferenceConfig.inputSize);
-probabilityVolume = applyNetwork(network, inputImage);
-occupancyVolume = probabilityVolume >= inferenceConfig.occupancyThreshold;
-if ~any(occupancyVolume(:))
-    error(['The model predicted an empty volume at threshold %.3f. ' ...
-        'No OBJ surface can be extracted.'], inferenceConfig.occupancyThreshold);
-end
+heightMap = applyNetwork(network, inputImage);
 
 if exist(outputDirectory, 'dir') ~= 7
     [created, message] = mkdir(outputDirectory);
@@ -60,25 +60,23 @@ if isempty(baseName)
     baseName = 'image';
 end
 result.inputImage = inputImage;
-result.probabilityVolume = probabilityVolume;
-result.occupancyVolume = occupancyVolume;
-result.occupancyThreshold = inferenceConfig.occupancyThreshold;
+result.heightMap = heightMap;
+result.surfacePath = fullfile(outputDirectory, [baseName, '-prediction.obj']);
+result.heightMapPath = fullfile(outputDirectory, [baseName, '-prediction-heightmap.png']);
+result.dataPath = fullfile(outputDirectory, [baseName, '-prediction.mat']);
+result.meshPath = result.surfacePath;
 result.weightsPath = weightsPath;
 result.inputPath = imagePath;
-result.volumePath = fullfile(outputDirectory, [baseName, '-prediction.mat']);
-result.meshPath = fullfile(outputDirectory, [baseName, '-prediction.obj']);
-result.silhouettePath = fullfile(outputDirectory, [baseName, '-prediction-silhouette.png']);
 
-exportVoxelMesh(probabilityVolume, result.meshPath, result.occupancyThreshold);
-imwrite(any(occupancyVolume, 3), result.silhouettePath);
-save(result.volumePath, 'inputImage', 'probabilityVolume', 'occupancyVolume', ...
-    'inferenceConfig', 'weightsPath', 'imagePath', '-mat7-binary');
+exportSurfaceMesh(heightMap, result.surfacePath);
+imwrite(heightMap, result.heightMapPath);
+save(result.dataPath, 'inputImage', 'heightMap', 'inferenceConfig', ...
+    'weightsPath', 'imagePath', '-mat7-binary');
 fprintf('Loaded weights: %s\n', weightsPath);
-fprintf('Resized grayscale input: %d x %d\n', ...
+fprintf('Resized input depthmap: %d x %d\n', ...
     inferenceConfig.inputSize, inferenceConfig.inputSize);
-fprintf('Saved predicted volume: %s\n', result.volumePath);
-fprintf('Saved silhouette: %s\n', result.silhouettePath);
-fprintf('Saved 3D mesh: %s\n', result.meshPath);
+fprintf('Saved predicted height map: %s\n', result.heightMapPath);
+fprintf('Saved reconstructed 3D surface: %s\n', result.surfacePath);
 end
 
 function grayscaleImage = readNormalizedGrayscale(imagePath)

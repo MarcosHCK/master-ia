@@ -2,7 +2,6 @@
 %
 \documentclass[12pt,a4paper]{article}
 \usepackage{amsmath}
-\usepackage{graphicx}
 \usepackage[utf8]{inputenc}
 \usepackage{indentfirst}
 \usepackage{polyglossia}
@@ -15,79 +14,57 @@
 \begin{document}
 
 \begin{titlepage}
-
   \centering
   {\huge\bfseries Reporte \#8\par}
-	{\Large Autor: \itshape Marcos Antonio Pérez Lorenzo\par}
+  {\Large Autor: \itshape Marcos Antonio Pérez Lorenzo\par}
 \end{titlepage}
 
 \pagebreak
 
 \section{Objetivo y alcance}
 
-El proyecto transforma una imagen monocromática de \(16\times16\) píxeles en una cuadrícula de ocupación de \(16\times16\times16\) vóxeles. El tamaño de entrada, la resolución volumétrica y el ancho de la capa oculta son configurables. La ejecución se divide en tres etapas independientes: generar los ejemplos, entrenar y guardar los pesos, y aplicar los pesos guardados a una imagen nueva.
+El proyecto transforma una imagen de profundidad vista desde arriba en una superficie 3D representada como un mapa de alturas. Cada píxel de entrada codifica la altura normalizada de la superficie en esa posición; la red predice una cuadrícula de alturas configurable y se exporta como una malla triangular OBJ. El tamaño de entrada, la resolución de la superficie y el ancho de la capa oculta son configurables. La ejecución se divide en tres etapas: generar ejemplos, entrenar y guardar los pesos, y aplicar los pesos a una imagen nueva.
 
-Esta tarea no tiene una solución geométrica única: una sola proyección bidimensional no indica de forma general qué geometría se encuentra detrás de la silueta ni cómo es la cara oculta. Por tanto, la red aprende las regularidades de los sólidos y de la cámara definidos aquí. El resultado es una reconstrucción condicionada por ese prior sintético, no una recuperación garantizada de cualquier objeto real.
+La tarea supone que la superficie es un campo de alturas, es decir, que existe una única altura por posición \((x,y)\); no se representan voladizos ni superficies verticales múltiples. Un mapa de profundidad proporciona directamente una medida de altura por píxel. La red aprende a remuestrear y regularizar esa señal, y no puede recuperar detalles ausentes de la resolución o de la imagen de entrada.
 
 \section{Datos sintéticos}
 
-La función \texttt{generateSyntheticData.m} crea cinco clases de sólidos: esferas, elipsoides, prismas rectangulares, cilindros elípticos y conos. Varía sus dimensiones, orientación y posición usando semillas reproducibles. Cada sólido se rasteriza en una cuadrícula cúbica; su imagen es la media de ocupación a lo largo del eje \(z\), redimensionada mediante interpolación bilineal al tamaño de entrada. En consecuencia, la imagen en escala de grises incluye información aproximada sobre la profundidad proyectada, no solamente una silueta binaria.
+La función \texttt{generateSyntheticData.m} crea campos de altura suaves y reproducibles combinando pendientes, colinas y depresiones gaussianas y pequeñas ondulaciones. El mapa normalizado se remuestrea por interpolación bilineal al tamaño de entrada, que actúa como mapa de profundidad visto desde arriba. Cada pareja incluye la imagen de profundidad y el mapa objetivo de alturas, que puede tener una resolución de salida distinta.
 
-El programa \texttt{generate\_examples.m} genera y guarda las particiones en \texttt{examples.mat}. Con la configuración predeterminada, entrenamiento, validación y prueba contienen respectivamente \(510\), \(85\) y \(85\) ejemplos, cada partición con una semilla independiente. Los ejemplos incluyen tanto las imágenes como sus volúmenes objetivo. El archivo guardado permite volver a entrenar sin regenerar los ejemplos; el usuario puede modificar en el script el tamaño, el número de ejemplos y la semilla.
+El programa \texttt{generate\_examples.m} genera y guarda las particiones en \texttt{examples.mat}. La variable \texttt{N} configura el tamaño cuadrado de entrada \(N\times N\); la primera capa se construye automáticamente con \(N^2\) valores. Con la configuración predeterminada, entrenamiento, validación y prueba contienen respectivamente \(510\), \(85\) y \(85\) ejemplos, cada partición con una semilla independiente. Cada ejemplo guarda la imagen de profundidad y su mapa de alturas objetivo. El archivo permite volver a entrenar sin regenerar los ejemplos; el usuario puede cambiar el tamaño, las cantidades y la semilla en el script.
 
 \section{Arquitectura y entrenamiento}
 
-La entrada se aplana en \(N^2\) valores y se centra restando \(0.5\). Una capa oculta ReLU de \(96\) unidades se conecta a una capa de salida sigmoide de \(R^3\) unidades, donde \(R\) es la resolución de la cuadrícula de vóxeles. Para cada vóxel, la salida estima su probabilidad de ocupación:
+La entrada se aplana en \(N^2\) valores y se centra restando \(0.5\). Una capa oculta ReLU de \(96\) unidades se conecta a una capa de salida sigmoide de \(R^2\) unidades, donde \(R\) es la resolución del mapa de alturas. Cada salida estima una altura normalizada entre cero y uno:
 \begin{align*}
   \mathbf{h} &= \operatorname{ReLU}\!\left((\mathbf{x}-0.5)\mathbf{W}_1+\mathbf{b}_1\right),\\
-  \mathbf{p} &= \sigma\!\left(\mathbf{h}\mathbf{W}_2+\mathbf{b}_2\right).
+  \hat{\mathbf{z}} &= \sigma\!\left(\mathbf{h}\mathbf{W}_2+\mathbf{b}_2\right).
 \end{align*}
 
-El programa \texttt{train\_network.m} carga \texttt{examples.mat}, entrena la red y escribe \texttt{trained-network.mat}. El entrenamiento usa mini lotes, entropía cruzada binaria, regularización \(L_2\), recorte de gradiente y parada temprana sobre la pérdida de validación. Como sólo una pequeña fracción de los vóxeles está ocupada, la pérdida pondera esa clase seis veces más que la clase vacía. Al terminar, se elige con validación el umbral de ocupación que maximiza el IoU volumétrico.
+El programa \texttt{train\_network.m} carga \texttt{examples.mat}, entrena la red y escribe \texttt{trained-network.mat}. El entrenamiento usa mini lotes, error cuadrático medio, regularización \(L_2\), recorte de gradiente y parada temprana según el error de validación. La función sigmoide restringe las alturas predichas al intervalo normalizado \([0,1]\).
 
-El archivo de pesos contiene los parámetros de la red y los metadatos necesarios para inferencia: tamaño esperado de imagen, resolución volumétrica y umbral de ocupación. Guarda también un resumen de entrenamiento, pero no incluye los ejemplos. Por tanto, la inferencia puede ejecutarse posteriormente sin el conjunto de entrenamiento ni el archivo \texttt{examples.mat}.
+El archivo de pesos contiene los parámetros de la red y los metadatos necesarios para inferencia: tamaño esperado de imagen y resolución de la superficie. Guarda también un resumen de entrenamiento, pero no incluye los ejemplos. La inferencia puede ejecutarse después sin cargar ni regenerar el conjunto de datos.
 
 \section{Evaluación}
 
-Se informa el IoU volumétrico medio por ejemplo, el IoU de las proyecciones binarias, la exactitud por vóxel y la entropía cruzada. El IoU compara la intersección con la unión de los conjuntos ocupados. La exactitud puede parecer elevada aunque se reconstruya mal la forma, porque la mayoría de los vóxeles está vacía; por ello, no debe interpretarse sin los IoU.
+La evaluación informa error cuadrático medio (MSE), raíz del error cuadrático medio (RMSE) y error absoluto medio (MAE) entre los mapas de altura predichos y los objetivos. Las métricas se calculan sobre ejemplos de prueba reservados y no deben interpretarse como garantía de rendimiento en superficies o sensores reales.
 
-Con la configuración guardada, el entrenamiento usó \(510\) ejemplos, validó con \(85\), reservó \(85\) para la prueba, y permitió hasta \(3000\) épocas, con lotes de \(32\) ejemplos y una tasa de aprendizaje de \(0.003\). La parada temprana se activó en la época \(2084\), y se restauró el mejor punto de validación, de la época \(2054\). La entropía cruzada ponderada fue \(484.2085\) para entrenamiento y \(568.9272\) para validación; la validación obtuvo un IoU volumétrico de \(0.5943\). En la prueba, la entropía cruzada sin ponderar fue \(322.2718\), el IoU volumétrico \(0.5893\), el IoU de silueta \(0.8278\) y la exactitud por vóxel \(0.9663\). Estos valores describen el conjunto sintético reservado y la semilla registrada; no deben interpretarse como una garantía de reconstrucción de objetos reales.
-
-Las tres imágenes siguientes presentan el mismo ejemplo reservado desde distintas etapas: la imagen de entrada en escala de grises que recibe la red, la silueta binaria del objetivo y la silueta de la predicción binarizada. Las dos siluetas se muestran para comparar la proyección; la entrada real de la red sigue siendo la imagen en escala de grises.
-
-\begin{figure}[ht]
-  \centering
-  \begin{tabular}{ccc}
-    \includegraphics[width=0.27\textwidth]{test-input.png} &
-    \includegraphics[width=0.27\textwidth]{target-silhouette.png} &
-    \includegraphics[width=0.27\textwidth]{predicted-silhouette.png} \\
-    Entrada monocromática & Silueta objetivo & Silueta predicha
-  \end{tabular}
-  \caption{Imagen de entrada, proyección binaria del volumen objetivo y proyección binaria del volumen reconstruido.}
-\end{figure}
-
-La figura siguiente compara, para ese mismo ejemplo, las mallas de la forma objetivo y de la predicción desde una vista isométrica. Se usa el mismo ángulo de cámara y escala para ambos modelos; los paneles se colocan con una separación reducida para facilitar su comparación. Los archivos \texttt{prediction.obj} y \texttt{target.obj} contienen las mallas triangulares exportadas, que también se pueden inspeccionar en un visor 3D.
-
-\begin{figure}[ht]
-  \centering
-  \includegraphics[width=0.95\textwidth]{voxel-comparison.png}
-  \caption{Vista isométrica del volumen objetivo (izquierda, azul) y del volumen reconstruido (derecha, naranja), para el primer ejemplo del conjunto de prueba reservado.}
-\end{figure}
+La función \texttt{exportHeldOutArtifacts.m} puede escribir el mapa de profundidad de entrada, los mapas de altura objetivo y predicho, y sus mallas OBJ. El OBJ contiene una cuadrícula de vértices con \(x,y\) en \([-1,1]\) y \(z\) igual a la altura normalizada transformada a \([-1,1]\). Las superficies se pueden abrir en cualquier visor compatible con OBJ.
 
 \section{Conclusiones y limitaciones}
 
-El experimento demuestra un flujo reproducible que genera pares de datos, entrena una red neuronal, calcula métricas en un conjunto de prueba separado y exporta una superficie triangular. El IoU muestra que este MLP pequeño sólo recupera parcialmente los volúmenes; no es una solución de reconstrucción de alta calidad. El elevado desequilibrio entre vóxeles ocupados y vacíos también confirma por qué la exactitud global resulta insuficiente.
+El experimento demuestra un flujo reproducible que genera mapas de profundidad y altura emparejados, entrena una red neuronal, mide errores de regresión en un conjunto de prueba separado y exporta una superficie triangular. La salida representa una sola altura por posición del plano y no puede expresar geometría con voladizos o varias capas visibles desde una misma posición. La calidad depende también de la resolución y del rango de alturas normalizadas usados al preparar los datos.
 
-Como continuación convendría aumentar y diversificar los datos, probar un codificador convolucional 2D con un decodificador 3D, comparar varias vistas, y medir el rendimiento en geometrías y cámaras no vistas. Para pasar a imágenes reales se necesitarían ejemplos emparejados con modelos 3D, calibración y una definición coherente de escala y pose.
+Como continuación convendría probar un codificador convolucional 2D, aumentar la variedad de superficies sintéticas y evaluar con mapas de profundidad reales calibrados a una escala física coherente.
 
 \section{Ejecución}
 
 \begin{enumerate}
-  \item Ejecutar \texttt{generate\_examples.m} para crear \texttt{examples.mat}.
-  \item Ejecutar \texttt{train\_network.m} para entrenar usando esos ejemplos. El resultado es \texttt{trained-network.mat}, que contiene los pesos y la configuración de inferencia.
-  \item Para una imagen nueva, indicar su ruta en \texttt{infer\_image.m} y ejecutarlo. También se puede llamar \texttt{inferImage('trained-network.mat', 'mi-imagen.png')}. Esta etapa no genera datos ni vuelve a entrenar; guarda el volumen de probabilidades, la silueta y una malla OBJ en el directorio de salida.
+  \item Configurar \texttt{N} en \texttt{generate\_examples.m} para usar imágenes \(N\times N\), y ejecutar el script para crear \texttt{examples.mat}.
+  \item Ejecutar \texttt{train\_network.m} para entrenar y guardar \texttt{trained-network.mat}.
+  \item Indicar la ruta de un mapa de profundidad en \texttt{infer\_image.m} y ejecutarlo, o llamar \texttt{inferImage('trained-network.mat', 'mi-imagen.png')}. La inferencia guarda el mapa de alturas predicho, una imagen de alturas y una malla OBJ.
 \end{enumerate}
 
-La evaluación de entrenamiento escribe además las imágenes de comparación y las mallas objetivo/predicha usadas en este informe. La prueba de integración reducida está en \texttt{test\_report8.m}.
+La prueba de integración reducida está en \texttt{test\_report8.m}.
 
 \end{document}
