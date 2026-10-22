@@ -1,5 +1,5 @@
-function artifactPaths = exportHeldOutArtifacts(network, dataset, outputDirectory, testHeights)
-%EXPORTHeldOutArtifacts Export held-out depthmaps, height maps, and surface OBJ files.
+function artifactPaths = exportHeldOutArtifacts(network, dataset, outputDirectory, testProbabilities)
+%EXPORTHeldOutArtifacts Export held-out depthmaps, silhouettes, and volume meshes.
 
 if nargin < 3 || isempty(outputDirectory)
     outputDirectory = pwd;
@@ -17,39 +17,41 @@ requiredDatasetFields = {'testInputs', 'testTargets'};
 if ~isstruct(dataset) || ~all(isfield(dataset, requiredDatasetFields))
     error('dataset must contain testInputs and testTargets.');
 end
+resolution = network.voxelResolution;
 if size(dataset.testInputs, 2) ~= network.inputSize ^ 2 || ...
         size(dataset.testTargets, 1) ~= size(dataset.testInputs, 1) || ...
-        size(dataset.testTargets, 2) ~= network.surfaceResolution ^ 2 || ...
-        isempty(dataset.testInputs)
+        size(dataset.testTargets, 2) ~= resolution ^ 3 || isempty(dataset.testInputs)
     error('The held-out split dimensions do not match the saved network.');
 end
-if nargin < 4 || isempty(testHeights)
-    testHeights = applyNetwork(network, dataset.testInputs);
+if nargin < 4 || isempty(testProbabilities)
+    testProbabilities = applyNetwork(network, dataset.testInputs);
 end
-if ~isequal(size(testHeights), size(dataset.testTargets)) || ...
-        any(~isfinite(testHeights(:))) || ...
-        any(testHeights(:) < 0) || any(testHeights(:) > 1)
-    error('testHeights must match the held-out targets and lie in [0,1].');
+if ~isequal(size(testProbabilities), size(dataset.testTargets)) || ...
+        any(~isfinite(testProbabilities(:))) || ...
+        any(testProbabilities(:) < 0) || any(testProbabilities(:) > 1)
+    error('testProbabilities must match the held-out targets and lie in [0,1].');
 end
 
 exampleIndex = 1;
 testImage = reshape(dataset.testInputs(exampleIndex, :), ...
     network.inputSize, network.inputSize);
-targetHeightMap = reshape(dataset.testTargets(exampleIndex, :), ...
-    network.surfaceResolution, network.surfaceResolution);
-predictedHeightMap = reshape(testHeights(exampleIndex, :), ...
-    network.surfaceResolution, network.surfaceResolution);
-artifactPaths.inputDepthmap = fullfile(outputDirectory, 'test-input.png');
-artifactPaths.targetHeightmap = fullfile(outputDirectory, 'target-heightmap.png');
-artifactPaths.predictedHeightmap = fullfile(outputDirectory, 'predicted-heightmap.png');
-artifactPaths.predictedSurface = fullfile(outputDirectory, 'prediction.obj');
-artifactPaths.targetSurface = fullfile(outputDirectory, 'target.obj');
-artifactPaths.exampleIndex = exampleIndex;
+targetVolume = reshape(dataset.testTargets(exampleIndex, :), ...
+    resolution, resolution, resolution);
+predictedProbabilityVolume = reshape(testProbabilities(exampleIndex, :), ...
+    resolution, resolution, resolution);
+predictedVolume = predictedProbabilityVolume >= network.occupancyThreshold;
 
+artifactPaths.inputDepthmap = fullfile(outputDirectory, 'test-input.png');
+artifactPaths.targetSilhouette = fullfile(outputDirectory, 'target-silhouette.png');
+artifactPaths.predictedSilhouette = fullfile(outputDirectory, 'predicted-silhouette.png');
+artifactPaths.predictedMesh = fullfile(outputDirectory, 'prediction.obj');
+artifactPaths.targetMesh = fullfile(outputDirectory, 'target.obj');
+artifactPaths.exampleIndex = exampleIndex;
 imwrite(testImage, artifactPaths.inputDepthmap);
-imwrite(targetHeightMap, artifactPaths.targetHeightmap);
-imwrite(predictedHeightMap, artifactPaths.predictedHeightmap);
-exportSurfaceMesh(predictedHeightMap, artifactPaths.predictedSurface);
-exportSurfaceMesh(targetHeightMap, artifactPaths.targetSurface);
-fprintf('Saved held-out depthmaps, height maps, and surfaces to %s\n', outputDirectory);
+imwrite(any(targetVolume, 3), artifactPaths.targetSilhouette);
+imwrite(any(predictedVolume, 3), artifactPaths.predictedSilhouette);
+exportVoxelMesh(predictedProbabilityVolume, artifactPaths.predictedMesh, ...
+    network.occupancyThreshold);
+exportVoxelMesh(targetVolume, artifactPaths.targetMesh, 0.5);
+fprintf('Saved held-out depthmaps, silhouettes, and volume meshes to %s\n', outputDirectory);
 end

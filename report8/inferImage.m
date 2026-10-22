@@ -1,5 +1,5 @@
 function result = inferImage(weightsPath, imagePath, outputDirectory)
-%INFERIMAGE Reconstruct a 3-D height-field surface from a top-down depthmap.
+%INFERIMAGE Reconstruct a voxel volume from a top-down depthmap.
 % Example: inferImage('trained-network.mat', 'depthmap.png')
 
 scriptDirectory = fileparts(mfilename('fullpath'));
@@ -33,21 +33,28 @@ if ~isfield(savedModel, 'network') || ~isfield(savedModel, 'inferenceConfig')
 end
 network = savedModel.network;
 inferenceConfig = savedModel.inferenceConfig;
-if ~isfield(network, 'surfaceResolution') || ...
-        ~isfield(inferenceConfig, 'surfaceResolution')
-    error(['This checkpoint uses the previous voxel-occupancy model. ' ...
-        'Regenerate the dataset and retrain before running surface inference.']);
+if ~isfield(network, 'voxelResolution') || ...
+        ~isfield(inferenceConfig, 'voxelResolution') || ...
+        ~isfield(inferenceConfig, 'occupancyThreshold')
+    error(['This checkpoint does not contain the voxel-volume model. ' ...
+        'Regenerate the volume dataset and retrain before running inference.']);
 end
 if ~isfield(inferenceConfig, 'inputSize') || ...
         inferenceConfig.inputSize ~= network.inputSize || ...
-        inferenceConfig.surfaceResolution ~= network.surfaceResolution
+        inferenceConfig.voxelResolution ~= network.voxelResolution || ...
+        inferenceConfig.occupancyThreshold ~= network.occupancyThreshold
     error('Saved inference metadata does not match the network parameters.');
 end
 
 sourceImage = readNormalizedGrayscale(imagePath);
 inputImage = resizeGrayscaleImage(sourceImage, inferenceConfig.inputSize, ...
     inferenceConfig.inputSize);
-heightMap = applyNetwork(network, inputImage);
+probabilityVolume = applyNetwork(network, inputImage);
+occupancyVolume = probabilityVolume >= inferenceConfig.occupancyThreshold;
+if ~any(occupancyVolume(:))
+    error(['The model predicted an empty volume at threshold %.3f. ' ...
+        'No OBJ surface can be extracted.'], inferenceConfig.occupancyThreshold);
+end
 
 if exist(outputDirectory, 'dir') ~= 7
     [created, message] = mkdir(outputDirectory);
@@ -60,23 +67,26 @@ if isempty(baseName)
     baseName = 'image';
 end
 result.inputImage = inputImage;
-result.heightMap = heightMap;
-result.surfacePath = fullfile(outputDirectory, [baseName, '-prediction.obj']);
-result.heightMapPath = fullfile(outputDirectory, [baseName, '-prediction-heightmap.png']);
-result.dataPath = fullfile(outputDirectory, [baseName, '-prediction.mat']);
-result.meshPath = result.surfacePath;
+result.probabilityVolume = probabilityVolume;
+result.occupancyVolume = occupancyVolume;
+result.occupancyThreshold = inferenceConfig.occupancyThreshold;
 result.weightsPath = weightsPath;
 result.inputPath = imagePath;
+result.volumePath = fullfile(outputDirectory, [baseName, '-prediction.mat']);
+result.meshPath = fullfile(outputDirectory, [baseName, '-prediction.obj']);
+result.surfacePath = result.meshPath;
+result.silhouettePath = fullfile(outputDirectory, [baseName, '-prediction-silhouette.png']);
 
-exportSurfaceMesh(heightMap, result.surfacePath);
-imwrite(heightMap, result.heightMapPath);
-save(result.dataPath, 'inputImage', 'heightMap', 'inferenceConfig', ...
-    'weightsPath', 'imagePath', '-mat7-binary');
+exportVoxelMesh(probabilityVolume, result.meshPath, result.occupancyThreshold);
+imwrite(any(occupancyVolume, 3), result.silhouettePath);
+save(result.volumePath, 'inputImage', 'probabilityVolume', 'occupancyVolume', ...
+    'inferenceConfig', 'weightsPath', 'imagePath', '-mat7-binary');
 fprintf('Loaded weights: %s\n', weightsPath);
-fprintf('Resized input depthmap: %d x %d\n', ...
+fprintf('Resized depthmap input: %d x %d\n', ...
     inferenceConfig.inputSize, inferenceConfig.inputSize);
-fprintf('Saved predicted height map: %s\n', result.heightMapPath);
-fprintf('Saved reconstructed 3D surface: %s\n', result.surfacePath);
+fprintf('Saved predicted voxel volume: %s\n', result.volumePath);
+fprintf('Saved predicted silhouette: %s\n', result.silhouettePath);
+fprintf('Saved reconstructed 3D mesh: %s\n', result.meshPath);
 end
 
 function grayscaleImage = readNormalizedGrayscale(imagePath)

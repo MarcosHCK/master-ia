@@ -1,22 +1,23 @@
 function network = trainNetwork(network, trainingInputs, trainingTargets, ...
         validationInputs, validationTargets, options)
-%TRAINNETWORK Train the image-to-height-map MLP with mini-batch backprop.
+%TRAINNETWORK Train the image-to-voxel MLP with mini-batch backprop.
 
 if nargin < 6 || isempty(options)
     options = struct();
 end
-options = setDefault(options, 'learningRate', 0.01);
-options = setDefault(options, 'maxEpochs', 300);
-options = setDefault(options, 'batchSize', 32);
-options = setDefault(options, 'patience', 30);
-options = setDefault(options, 'minImprovement', 1e-5);
+options = setDefault(options, 'learningRate', 0.003);
+options = setDefault(options, 'maxEpochs', 80);
+options = setDefault(options, 'batchSize', 12);
+options = setDefault(options, 'patience', 15);
+options = setDefault(options, 'minImprovement', 1e-4);
 options = setDefault(options, 'weightDecay', 1e-5);
 options = setDefault(options, 'maxGradientNorm', 10);
 options = setDefault(options, 'seed', 1);
+options = setDefault(options, 'positiveClassWeight', 6);
 
 validateNetwork(network);
 inputFeatures = network.inputSize ^ 2;
-outputFeatures = network.surfaceResolution ^ 2;
+outputFeatures = network.voxelResolution ^ 3;
 validateData(trainingInputs, trainingTargets, inputFeatures, outputFeatures, 'training');
 validateData(validationInputs, validationTargets, inputFeatures, outputFeatures, 'validation');
 if ~isstruct(options) || ~isscalar(options) || ...
@@ -33,7 +34,9 @@ if ~isstruct(options) || ~isscalar(options) || ...
         ~isfinite(options.weightDecay) || options.weightDecay < 0 || ...
         ~isscalar(options.maxGradientNorm) || ~isfinite(options.maxGradientNorm) || ...
         options.maxGradientNorm <= 0 || ~isscalar(options.seed) || ...
-        ~isfinite(options.seed) || options.seed ~= floor(options.seed)
+        ~isfinite(options.seed) || options.seed ~= floor(options.seed) || ...
+        ~isscalar(options.positiveClassWeight) || ...
+        ~isfinite(options.positiveClassWeight) || options.positiveClassWeight <= 0
     error('Invalid training options.');
 end
 
@@ -65,9 +68,9 @@ for epoch = 1:options.maxEpochs
             repmat(network.b2, numel(batchIndices), 1);
         predictions = stableSigmoid(outputLogits);
 
-        % Mean squared height error averages over examples and surface points.
-        outputGradient = (2 / numel(batchTargets)) * ...
-            (predictions - batchTargets) .* predictions .* (1 - predictions);
+        classWeights = 1 + (options.positiveClassWeight - 1) * batchTargets;
+        outputGradient = (classWeights .* (predictions - batchTargets)) / ...
+            numel(batchIndices);
         weight2Gradient = hiddenActivations' * outputGradient + ...
             options.weightDecay * network.W2;
         bias2Gradient = sum(outputGradient, 1);
@@ -86,13 +89,15 @@ for epoch = 1:options.maxEpochs
         network.b2 = network.b2 - options.learningRate * gradientScale * bias2Gradient;
     end
 
-    trainingLossHistory(epoch) = meanSquaredError(network, trainingInputs, trainingTargets);
-    currentValidationLoss = meanSquaredError(network, validationInputs, validationTargets);
+    trainingLossHistory(epoch) = binaryCrossEntropy(network, trainingInputs, ...
+        trainingTargets, options.positiveClassWeight);
+    currentValidationLoss = binaryCrossEntropy(network, validationInputs, ...
+        validationTargets, options.positiveClassWeight);
     validationLossHistory(epoch) = currentValidationLoss;
 
     progressPercent = floor(100 * epoch / options.maxEpochs);
     while nextProgressPercent <= 100 && progressPercent >= nextProgressPercent
-        fprintf('Training progress: %d%% (epoch %d/%d; train MSE %.6f, validation MSE %.6f)\n', ...
+        fprintf('Training progress: %d%% (epoch %d/%d; train BCE %.6f, validation BCE %.6f)\n', ...
             nextProgressPercent, epoch, options.maxEpochs, ...
             trainingLossHistory(epoch), currentValidationLoss);
         fflush(stdout);
@@ -115,7 +120,8 @@ end
 
 epochsRun = epoch;
 network = bestNetwork;
-network.trainingLoss = meanSquaredError(network, trainingInputs, trainingTargets);
+network.trainingLoss = binaryCrossEntropy(network, trainingInputs, ...
+    trainingTargets, options.positiveClassWeight);
 network.validationLoss = bestValidationLoss;
 network.trainingLossHistory = trainingLossHistory(1:epochsRun);
 network.validationLossHistory = validationLossHistory(1:epochsRun);
@@ -138,7 +144,7 @@ end
 end
 
 function validateNetwork(network)
-requiredFields = {'inputSize', 'surfaceResolution', 'hiddenUnits', ...
+requiredFields = {'inputSize', 'voxelResolution', 'hiddenUnits', ...
     'inputMean', 'W1', 'b1', 'W2', 'b2'};
 if ~isstruct(network) || ~isscalar(network) || ...
         ~all(isfield(network, requiredFields))
@@ -146,8 +152,8 @@ if ~isstruct(network) || ~isscalar(network) || ...
 end
 if ~isequal(size(network.W1), [network.inputSize ^ 2, network.hiddenUnits]) || ...
         numel(network.b1) ~= network.hiddenUnits || ...
-        ~isequal(size(network.W2), [network.hiddenUnits, network.surfaceResolution ^ 2]) || ...
-        numel(network.b2) ~= network.surfaceResolution ^ 2
+        ~isequal(size(network.W2), [network.hiddenUnits, network.voxelResolution ^ 3]) || ...
+        numel(network.b2) ~= network.voxelResolution ^ 3
     error('Network parameter dimensions do not match the configured layer sizes.');
 end
 end
@@ -161,14 +167,18 @@ end
 if ~isnumeric(targets) || ~isreal(targets) || ndims(targets) ~= 2 || ...
         size(targets, 1) ~= size(inputs, 1) || ...
         size(targets, 2) ~= outputFeatures || any(~isfinite(targets(:))) || ...
-        any(targets(:) < 0) || any(targets(:) > 1)
-    error('%s targets must be matching normalized height-map rows in [0,1].', splitName);
+        any((targets(:) ~= 0) & (targets(:) ~= 1))
+    error('%s targets must be matching binary voxel rows.', splitName);
 end
 end
 
-function loss = meanSquaredError(network, inputs, targets)
+function loss = binaryCrossEntropy(network, inputs, targets, positiveClassWeight)
 predictions = applyNetwork(network, inputs);
-loss = mean((predictions(:) - targets(:)) .^ 2);
+positiveLoss = max(-log(max(predictions, realmin)), 0);
+negativeLoss = max(-log(max(1 - predictions, realmin)), 0);
+perVoxelLoss = positiveClassWeight * targets .* positiveLoss + ...
+    (1 - targets) .* negativeLoss;
+loss = mean(sum(perVoxelLoss, 2));
 end
 
 function probabilities = stableSigmoid(logits)

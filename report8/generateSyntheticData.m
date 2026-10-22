@@ -1,15 +1,15 @@
-function [inputs, targets] = generateSyntheticData(numExamples, inputSize, surfaceResolution, seed)
-%GENERATESYNTHETICDATA Make top-down depthmaps paired with height fields.
-% Input pixels encode normalized surface height; targets are continuous
-% normalized heights sampled on the requested output grid.
+function [inputs, targets] = generateSyntheticData(numExamples, inputSize, voxelResolution, seed)
+%GENERATESYNTHETICDATA Make top-down depthmaps paired with voxel solids.
+% Synthetic shapes are voxelized, then rendered as grayscale depthmaps from
+% above; brighter pixels indicate a greater occupied depth along z.
 
 if nargin < 4 || isempty(seed)
     seed = 1;
 end
 if ~isscalar(numExamples) || numExamples < 1 || numExamples ~= floor(numExamples) || ...
         ~isscalar(inputSize) || inputSize < 2 || inputSize ~= floor(inputSize) || ...
-        ~isscalar(surfaceResolution) || surfaceResolution < 2 || ...
-        surfaceResolution ~= floor(surfaceResolution) || ...
+        ~isscalar(voxelResolution) || voxelResolution < 4 || ...
+        voxelResolution ~= floor(voxelResolution) || ...
         ~isscalar(seed) || ~isfinite(seed) || seed ~= floor(seed)
     error('Counts and resolutions must be integers; the seed must be a finite integer.');
 end
@@ -18,40 +18,70 @@ previousRngState = rng;
 rng(seed, 'twister');
 restoreRng = onCleanup(@() rng(previousRngState));
 
+coordinates = linspace(-1, 1, voxelResolution);
+[worldX, worldY, worldZ] = ndgrid(coordinates, coordinates, coordinates);
 inputs = zeros(numExamples, inputSize * inputSize);
-targets = zeros(numExamples, surfaceResolution * surfaceResolution);
+targets = zeros(numExamples, voxelResolution ^ 3);
+
 for example = 1:numExamples
-    % Smooth random field with several localized hills/depressions. The
-    % broad Gaussian components make varied, continuous, height-field-like
-    % surfaces without requiring image-processing or deep-learning packages.
-    [surfaceX, surfaceY] = meshgrid(linspace(-1, 1, surfaceResolution), ...
-        linspace(-1, 1, surfaceResolution));
-    baseHeight = 0.25 + 0.20 * rand();
-    slopeX = 0.12 * (2 * rand() - 1);
-    slopeY = 0.12 * (2 * rand() - 1);
-    heightMap = baseHeight + slopeX * surfaceX + slopeY * surfaceY;
-    featureCount = randi([2, 6]);
-    for feature = 1:featureCount
-        centerX = 1.5 * rand() - 0.75;
-        centerY = 1.5 * rand() - 0.75;
-        widthX = 0.12 + 0.48 * rand();
-        widthY = 0.12 + 0.48 * rand();
-        amplitude = (0.08 + 0.35 * rand()) * (2 * (rand() > 0.5) - 1);
-        heightMap = heightMap + amplitude * exp(-0.5 * ...
-            (((surfaceX - centerX) / widthX) .^ 2 + ...
-            ((surfaceY - centerY) / widthY) .^ 2));
+    shapeType = randi(5);
+    center = 0.18 * (2 * rand(1, 3) - 1);
+    angles = (pi / 6) * (2 * rand(1, 3) - 1);
+    rotationX = [1, 0, 0; 0, cos(angles(1)), -sin(angles(1)); ...
+        0, sin(angles(1)), cos(angles(1))];
+    rotationY = [cos(angles(2)), 0, sin(angles(2)); 0, 1, 0; ...
+        -sin(angles(2)), 0, cos(angles(2))];
+    rotationZ = [cos(angles(3)), -sin(angles(3)), 0; ...
+        sin(angles(3)), cos(angles(3)), 0; 0, 0, 1];
+    rotation = rotationZ * rotationY * rotationX;
+
+    offsetX = worldX - center(1);
+    offsetY = worldY - center(2);
+    offsetZ = worldZ - center(3);
+    localX = rotation(1, 1) * offsetX + rotation(2, 1) * offsetY + ...
+        rotation(3, 1) * offsetZ;
+    localY = rotation(1, 2) * offsetX + rotation(2, 2) * offsetY + ...
+        rotation(3, 2) * offsetZ;
+    localZ = rotation(1, 3) * offsetX + rotation(2, 3) * offsetY + ...
+        rotation(3, 3) * offsetZ;
+
+    switch shapeType
+        case 1  % Sphere
+            radius = 0.42 + 0.22 * rand();
+            occupied = localX .^ 2 + localY .^ 2 + localZ .^ 2 <= radius ^ 2;
+        case 2  % Ellipsoid
+            radii = 0.38 + 0.25 * rand(1, 3);
+            occupied = (localX / radii(1)) .^ 2 + ...
+                (localY / radii(2)) .^ 2 + (localZ / radii(3)) .^ 2 <= 1;
+        case 3  % Rectangular prism
+            halfWidths = 0.34 + 0.25 * rand(1, 3);
+            occupied = abs(localX) <= halfWidths(1) & ...
+                abs(localY) <= halfWidths(2) & abs(localZ) <= halfWidths(3);
+        case 4  % Elliptical cylinder, with axis along local z
+            radii = 0.34 + 0.14 * rand(1, 2);
+            halfHeight = 0.42 + 0.20 * rand();
+            occupied = (localX / radii(1)) .^ 2 + ...
+                (localY / radii(2)) .^ 2 <= 1 & abs(localZ) <= halfHeight;
+        otherwise  % Cone, with tip along local positive z
+            baseRadii = 0.42 + 0.12 * rand(1, 2);
+            halfHeight = 0.48 + 0.16 * rand();
+            normalizedHeight = (localZ + halfHeight) / (2 * halfHeight);
+            radiusFactor = max(0, 1 - normalizedHeight);
+            occupied = normalizedHeight >= 0 & normalizedHeight <= 1 & ...
+                (localX / baseRadii(1)) .^ 2 + ...
+                (localY / baseRadii(2)) .^ 2 <= radiusFactor .^ 2;
     end
 
-    % Add a small smooth ripple to avoid an overly narrow family of shapes.
-    frequency = 1 + 3 * rand();
-    phase = 2 * pi * rand();
-    heightMap = heightMap + 0.035 * sin(frequency * pi * surfaceX + phase) .* ...
-        cos((frequency + 0.5) * pi * surfaceY - phase);
-    heightMap = min(1, max(0, heightMap));
-
-    depthmap = resizeGrayscaleImage(heightMap, inputSize, inputSize);
+    volume = double(occupied);
+    topDownDepthmap = zeros(voxelResolution, voxelResolution);
+    for depthIndex = 1:voxelResolution
+        visibleAtDepth = occupied(:, :, depthIndex);
+        topDownDepthmap(visibleAtDepth) = ...
+            depthIndex / voxelResolution;
+    end
+    depthmap = resizeGrayscaleImage(topDownDepthmap, inputSize, inputSize);
     inputs(example, :) = depthmap(:)';
-    targets(example, :) = heightMap(:)';
+    targets(example, :) = volume(:)';
 end
 
 clear restoreRng;

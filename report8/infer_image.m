@@ -1,4 +1,4 @@
-% INFER_IMAGE.M Reconstruct a surface from a top-down depthmap checkpoint.
+% INFER_IMAGE.M Reconstruct a voxel volume from a top-down depthmap checkpoint.
 % Set imagePath below to a depthmap image, then run:
 %   octave --no-gui --quiet infer_image.m
 % Or call inferImage(weightsPath, imagePath, outputDirectory) directly.

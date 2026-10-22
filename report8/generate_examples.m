@@ -7,7 +7,7 @@ datasetPath = fullfile(scriptDirectory, 'examples.mat');
 
 % Set N to choose the square network input dimensions (N-by-N).
 datasetConfig.inputSize = 64;
-datasetConfig.surfaceResolution = 16;
+datasetConfig.voxelResolution = 16;
 datasetConfig.trainingExamples = 510;
 datasetConfig.validationExamples = 85;
 datasetConfig.testExamples = 85;

@@ -3,7 +3,6 @@
 \documentclass[12pt,a4paper]{article}
 \usepackage{amsmath}
 \usepackage[utf8]{inputenc}
-\usepackage{indentfirst}
 \usepackage{polyglossia}
 \usepackage{setspace}
 \usepackage{hyperref}
@@ -23,48 +22,44 @@
 
 \section{Objetivo y alcance}
 
-El proyecto transforma una imagen de profundidad vista desde arriba en una superficie 3D representada como un mapa de alturas. Cada píxel de entrada codifica la altura normalizada de la superficie en esa posición; la red predice una cuadrícula de alturas configurable y se exporta como una malla triangular OBJ. El tamaño de entrada, la resolución de la superficie y el ancho de la capa oculta son configurables. La ejecución se divide en tres etapas: generar ejemplos, entrenar y guardar los pesos, y aplicar los pesos a una imagen nueva.
+El proyecto recibe una imagen de profundidad desde arriba y predice directamente una cuadrícula tridimensional de ocupación. Una capa de salida sigmoide estima la probabilidad de que cada vóxel esté ocupado. El tamaño de entrada \(N\times N\), la resolución volumétrica \(R\times R\times R\) y el ancho oculto son configurables. La cuadrícula se umbraliza y se exporta como una malla triangular OBJ.
 
-La tarea supone que la superficie es un campo de alturas, es decir, que existe una única altura por posición \((x,y)\); no se representan voladizos ni superficies verticales múltiples. Un mapa de profundidad proporciona directamente una medida de altura por píxel. La red aprende a remuestrear y regularizar esa señal, y no puede recuperar detalles ausentes de la resolución o de la imagen de entrada.
+Una sola vista superior no determina de manera única la geometría oculta. La reconstrucción depende del prior aprendido de los sólidos y las cámaras usados para crear los datos sintéticos; no garantiza recuperar cualquier objeto real.
 
 \section{Datos sintéticos}
 
-La función \texttt{generateSyntheticData.m} crea campos de altura suaves y reproducibles combinando pendientes, colinas y depresiones gaussianas y pequeñas ondulaciones. El mapa normalizado se remuestrea por interpolación bilineal al tamaño de entrada, que actúa como mapa de profundidad visto desde arriba. Cada pareja incluye la imagen de profundidad y el mapa objetivo de alturas, que puede tener una resolución de salida distinta.
+La función \texttt{generateSyntheticData.m} genera esferas, elipsoides, prismas rectangulares, cilindros elípticos y conos con dimensiones, posición y orientación variables. Cada sólido se voxeliza en una cuadrícula cúbica. La entrada se forma proyectando el sólido desde arriba y codificando en escala de grises la profundidad ocupada a lo largo del eje \(z\). Cada objetivo es el volumen binario completo aplanado en un vector de \(R^3\) valores.
 
-El programa \texttt{generate\_examples.m} genera y guarda las particiones en \texttt{examples.mat}. La variable \texttt{N} configura el tamaño cuadrado de entrada \(N\times N\); la primera capa se construye automáticamente con \(N^2\) valores. Con la configuración predeterminada, entrenamiento, validación y prueba contienen respectivamente \(510\), \(85\) y \(85\) ejemplos, cada partición con una semilla independiente. Cada ejemplo guarda la imagen de profundidad y su mapa de alturas objetivo. El archivo permite volver a entrenar sin regenerar los ejemplos; el usuario puede cambiar el tamaño, las cantidades y la semilla en el script.
+El script \texttt{generate\_examples.m} configura el tamaño cuadrado de entrada en \texttt{N} (guardado como \texttt{inputSize}), la resolución del objetivo en \texttt{voxelResolution} y las cantidades de las particiones. Con la configuración predeterminada se generan 510 ejemplos de entrenamiento, 85 de validación y 85 de prueba. El archivo \texttt{examples.mat} contiene las particiones y su configuración; se debe regenerar cuando cambie el tamaño de entrada o la resolución de vóxeles.
 
 \section{Arquitectura y entrenamiento}
 
-La entrada se aplana en \(N^2\) valores y se centra restando \(0.5\). Una capa oculta ReLU de \(96\) unidades se conecta a una capa de salida sigmoide de \(R^2\) unidades, donde \(R\) es la resolución del mapa de alturas. Cada salida estima una altura normalizada entre cero y uno:
+La imagen se aplana en \(N^2\) entradas y se centra restando \(0.5\). La MLP usa una capa oculta ReLU y una salida sigmoide con \(R^3\) unidades:
 \begin{align*}
   \mathbf{h} &= \operatorname{ReLU}\!\left((\mathbf{x}-0.5)\mathbf{W}_1+\mathbf{b}_1\right),\\
-  \hat{\mathbf{z}} &= \sigma\!\left(\mathbf{h}\mathbf{W}_2+\mathbf{b}_2\right).
+  \mathbf{p} &= \sigma\!\left(\mathbf{h}\mathbf{W}_2+\mathbf{b}_2\right).
 \end{align*}
 
-El programa \texttt{train\_network.m} carga \texttt{examples.mat}, entrena la red y escribe \texttt{trained-network.mat}. El entrenamiento usa mini lotes, error cuadrático medio, regularización \(L_2\), recorte de gradiente y parada temprana según el error de validación. La función sigmoide restringe las alturas predichas al intervalo normalizado \([0,1]\).
+El entrenamiento usa mini lotes, entropía cruzada binaria, ponderación de la clase ocupada, regularización \(L_2\), recorte de gradiente y parada temprana basada en validación. Después se selecciona un umbral de ocupación que maximiza el IoU volumétrico sobre la partición de validación.
 
-El archivo de pesos contiene los parámetros de la red y los metadatos necesarios para inferencia: tamaño esperado de imagen y resolución de la superficie. Guarda también un resumen de entrenamiento, pero no incluye los ejemplos. La inferencia puede ejecutarse después sin cargar ni regenerar el conjunto de datos.
+\section{Evaluación y exportación}
 
-\section{Evaluación}
+En el conjunto de prueba se informan entropía cruzada, IoU volumétrico, IoU de silueta y exactitud por vóxel. La exactitud debe interpretarse junto con IoU, ya que la mayoría del volumen puede estar vacío.
 
-La evaluación informa error cuadrático medio (MSE), raíz del error cuadrático medio (RMSE) y error absoluto medio (MAE) entre los mapas de altura predichos y los objetivos. Las métricas se calculan sobre ejemplos de prueba reservados y no deben interpretarse como garantía de rendimiento en superficies o sensores reales.
+La función \texttt{inferImage.m} normaliza y redimensiona la imagen al \(N\times N\) guardado en el checkpoint, aplica la red, umbraliza el volumen y guarda el volumen de probabilidades, la ocupación binaria, la silueta superior y una malla OBJ. La malla es la isosuperficie de la predicción volumétrica, no una elevación calculada píxel a píxel. Los archivos OBJ de predicción y objetivo también se pueden exportar para el ejemplo de prueba reservado.
 
-La función \texttt{exportHeldOutArtifacts.m} puede escribir el mapa de profundidad de entrada, los mapas de altura objetivo y predicho, y sus mallas OBJ. El OBJ contiene una cuadrícula de vértices con \(x,y\) en \([-1,1]\) y \(z\) igual a la altura normalizada transformada a \([-1,1]\). Las superficies se pueden abrir en cualquier visor compatible con OBJ.
+\section{Limitaciones}
 
-\section{Conclusiones y limitaciones}
-
-El experimento demuestra un flujo reproducible que genera mapas de profundidad y altura emparejados, entrena una red neuronal, mide errores de regresión en un conjunto de prueba separado y exporta una superficie triangular. La salida representa una sola altura por posición del plano y no puede expresar geometría con voladizos o varias capas visibles desde una misma posición. La calidad depende también de la resolución y del rango de alturas normalizadas usados al preparar los datos.
-
-Como continuación convendría probar un codificador convolucional 2D, aumentar la variedad de superficies sintéticas y evaluar con mapas de profundidad reales calibrados a una escala física coherente.
+Una imagen de profundidad superior no muestra necesariamente las caras ocultas ni permite distinguir sólidos con la misma proyección. El resultado es una reconstrucción tridimensional condicionada por los ejemplos sintéticos, la resolución de vóxeles y el umbral elegido; no es una recuperación geométrica garantizada. Para usar imágenes reales hacen falta ejemplos emparejados con volúmenes 3D y una escala y pose coherentes.
 
 \section{Ejecución}
 
 \begin{enumerate}
-  \item Configurar \texttt{N} en \texttt{generate\_examples.m} para usar imágenes \(N\times N\), y ejecutar el script para crear \texttt{examples.mat}.
-  \item Ejecutar \texttt{train\_network.m} para entrenar y guardar \texttt{trained-network.mat}.
-  \item Indicar la ruta de un mapa de profundidad en \texttt{infer\_image.m} y ejecutarlo, o llamar \texttt{inferImage('trained-network.mat', 'mi-imagen.png')}. La inferencia guarda el mapa de alturas predicho, una imagen de alturas y una malla OBJ.
+  \item Configurar \texttt{N} en \texttt{generate\_examples.m}; ejecutar el script para generar \texttt{examples.mat} con entradas \(N\times N\).
+  \item Ejecutar \texttt{train\_network.m} para entrenar la red y guardar \texttt{trained-network.mat}.
+  \item Para una imagen nueva, indicar su ruta en \texttt{infer\_image.m}, o llamar \texttt{inferImage('trained-network.mat', 'depthmap.png')}.
 \end{enumerate}
 
-La prueba de integración reducida está en \texttt{test\_report8.m}.
+La prueba de integración está en \texttt{test\_report8.m}.
 
 \end{document}

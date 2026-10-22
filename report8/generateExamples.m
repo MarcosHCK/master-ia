@@ -14,8 +14,8 @@ if ~ischar(datasetPath) || isempty(datasetPath)
     error('datasetPath must be a non-empty character vector.');
 end
 
-config = setDefault(config, 'inputSize', 16);
-config = setDefault(config, 'surfaceResolution', 16);
+config = setDefault(config, 'voxelResolution', 16);
+config = setDefault(config, 'voxelResolution', 16);
 config = setDefault(config, 'trainingExamples', 510);
 config = setDefault(config, 'validationExamples', 85);
 config = setDefault(config, 'testExamples', 85);
@@ -25,11 +25,11 @@ validateConfig(config);
 fprintf('Generating %d training, %d validation, and %d test examples...\n', ...
     config.trainingExamples, config.validationExamples, config.testExamples);
 [trainingInputs, trainingTargets] = generateSyntheticData( ...
-    config.trainingExamples, config.inputSize, config.surfaceResolution, config.seed + 1);
+    config.trainingExamples, config.inputSize, config.voxelResolution, config.seed + 1);
 [validationInputs, validationTargets] = generateSyntheticData( ...
-    config.validationExamples, config.inputSize, config.surfaceResolution, config.seed + 2);
+    config.validationExamples, config.inputSize, config.voxelResolution, config.seed + 2);
 [testInputs, testTargets] = generateSyntheticData( ...
-    config.testExamples, config.inputSize, config.surfaceResolution, config.seed + 3);
+    config.testExamples, config.inputSize, config.voxelResolution, config.seed + 3);
 
 dataset = struct();
 dataset.config = config;
@@ -61,7 +61,7 @@ end
 end
 
 function validateConfig(config)
-integerFields = {'inputSize', 'surfaceResolution', 'trainingExamples', ...
+integerFields = {'inputSize', 'voxelResolution', 'trainingExamples', ...
     'validationExamples', 'testExamples', 'seed'};
 for fieldIndex = 1:numel(integerFields)
     fieldName = integerFields{fieldIndex};
@@ -71,9 +71,9 @@ for fieldIndex = 1:numel(integerFields)
         error('config.%s must be a finite integer.', fieldName);
     end
 end
-if config.inputSize < 2 || config.surfaceResolution < 2 || ...
+if config.inputSize < 2 || config.voxelResolution < 4 || ...
         config.trainingExamples < 1 || config.validationExamples < 1 || ...
         config.testExamples < 1
-    error('Image/surface resolutions and split counts must be positive and valid.');
+    error('Image/voxel resolutions and split counts must be positive and valid.');
 end
 end

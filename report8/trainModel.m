@@ -18,13 +18,14 @@ if ~ischar(datasetPath) || isempty(datasetPath) || ...
 end
 
 options = setDefault(options, 'hiddenUnits', 96);
-options = setDefault(options, 'learningRate', 0.01);
-options = setDefault(options, 'maxEpochs', 1000);
+options = setDefault(options, 'learningRate', 0.003);
+options = setDefault(options, 'maxEpochs', 3000);
 options = setDefault(options, 'batchSize', 32);
 options = setDefault(options, 'patience', 30);
 options = setDefault(options, 'minImprovement', 1e-4);
 options = setDefault(options, 'weightDecay', 1e-5);
 options = setDefault(options, 'maxGradientNorm', 10);
+options = setDefault(options, 'positiveClassWeight', 6);
 options = setDefault(options, 'seed', 2026);
 options = setDefault(options, 'exportEvaluationArtifacts', true);
 validateOptions(options);
@@ -39,13 +40,13 @@ if ~all(isfield(dataset, requiredFields))
     error('Dataset file is missing one or more required splits or its config.');
 end
 config = dataset.config;
-if ~isfield(config, 'surfaceResolution')
-    error(['This dataset uses the previous voxel-occupancy format. ' ...
-        'Regenerate it with generateExamples before training the height-map model.']);
+if ~isfield(config, 'voxelResolution')
+    error(['This dataset uses the height-map format. ' ...
+        'Regenerate it with generateExamples before training the voxel-volume model.']);
 end
 validateDatasetSplits(dataset, config);
 
-network = buildNetwork(config.inputSize, config.surfaceResolution, ...
+network = buildNetwork(config.inputSize, config.voxelResolution, ...
     options.hiddenUnits, mean(dataset.trainingTargets(:)), options.seed);
 trainingOptions.learningRate = options.learningRate;
 trainingOptions.maxEpochs = options.maxEpochs;
@@ -54,17 +55,21 @@ trainingOptions.patience = options.patience;
 trainingOptions.minImprovement = options.minImprovement;
 trainingOptions.weightDecay = options.weightDecay;
 trainingOptions.maxGradientNorm = options.maxGradientNorm;
+trainingOptions.positiveClassWeight = options.positiveClassWeight;
 trainingOptions.seed = options.seed + 4;
 
-fprintf('Training %d -> %d -> %d image-to-height-map network.\n', ...
-    config.inputSize ^ 2, options.hiddenUnits, config.surfaceResolution ^ 2);
+fprintf('Training %d -> %d -> %d image-to-volume network.\n', ...
+    config.inputSize ^ 2, options.hiddenUnits, config.voxelResolution ^ 3);
 network = trainNetwork(network, dataset.trainingInputs, dataset.trainingTargets, ...
     dataset.validationInputs, dataset.validationTargets, trainingOptions);
-[testMetrics, testHeights] = evaluateNetwork(network, ...
+[network.occupancyThreshold, validationVoxelIoU] = ...
+    selectOccupancyThreshold(network, dataset.validationInputs, dataset.validationTargets);
+[testMetrics, testProbabilities] = evaluateNetwork(network, ...
     dataset.testInputs, dataset.testTargets);
 
 inferenceConfig = struct('inputSize', network.inputSize, ...
-    'surfaceResolution', network.surfaceResolution);
+    'voxelResolution', network.voxelResolution, ...
+    'occupancyThreshold', network.occupancyThreshold);
 trainingSummary = struct();
 trainingSummary.datasetPath = datasetPath;
 trainingSummary.datasetConfig = config;
@@ -77,11 +82,12 @@ trainingSummary.bestEpoch = network.bestEpoch;
 trainingSummary.stoppedEarly = network.stoppedEarly;
 trainingSummary.trainingLoss = network.trainingLoss;
 trainingSummary.validationLoss = network.validationLoss;
+trainingSummary.validationVoxelIoU = validationVoxelIoU;
 trainingSummary.testMetrics = testMetrics;
 trainingSummary.trainingHistory = struct( ...
     'epoch', network.epochHistory, ...
-    'trainingMSE', network.trainingLossHistory, ...
-    'validationMSE', network.validationLossHistory);
+    'trainingBCE', network.trainingLossHistory, ...
+    'validationBCE', network.validationLossHistory);
 
 weightsDirectory = fileparts(weightsPath);
 if ~isempty(weightsDirectory) && exist(weightsDirectory, 'dir') ~= 7
@@ -92,8 +98,10 @@ if ~isempty(weightsDirectory) && exist(weightsDirectory, 'dir') ~= 7
 end
 fprintf('Finished at epoch %d (best epoch %d; early stopping: %s).\n', ...
     network.epochs, network.bestEpoch, yesNo(network.stoppedEarly));
-fprintf('Test height RMSE %.4f; MAE %.4f.\n', ...
-    testMetrics.rootMeanSquaredError, testMetrics.meanAbsoluteError);
+fprintf('Validation voxel IoU %.4f; test voxel IoU %.4f; silhouette IoU %.4f.\n', ...
+    validationVoxelIoU, testMetrics.voxelIoU, testMetrics.silhouetteIoU);
+fprintf('Selected occupancy threshold %.3f; voxel accuracy %.4f.\n', ...
+    network.occupancyThreshold, testMetrics.voxelAccuracy);
 
 network = rmfield(network, {'trainingLoss', 'validationLoss', ...
     'trainingLossHistory', 'validationLossHistory', 'epochHistory', ...
@@ -102,7 +110,7 @@ save(weightsPath, 'network', 'inferenceConfig', 'trainingSummary', '-mat7-binary
 fprintf('Saved network weights and inference metadata to %s\n', weightsPath);
 
 if options.exportEvaluationArtifacts
-    exportHeldOutArtifacts(network, dataset, weightsDirectory, testHeights);
+    exportHeldOutArtifacts(network, dataset, weightsDirectory, testProbabilities);
 end
 end
 
@@ -125,7 +133,7 @@ for fieldIndex = 1:numel(positiveIntegers)
         error('options.%s must be a finite positive integer.', fieldName);
     end
 end
-positiveValues = {'learningRate', 'maxGradientNorm'};
+positiveValues = {'learningRate', 'maxGradientNorm', 'positiveClassWeight'};
 for fieldIndex = 1:numel(positiveValues)
     fieldName = positiveValues{fieldIndex};
     value = options.(fieldName);
@@ -162,9 +170,10 @@ for splitIndex = 1:numel(splitNames)
     end
     if ~isnumeric(targets) || ~isreal(targets) || ndims(targets) ~= 2 || ...
             size(targets, 1) ~= size(inputs, 1) || ...
-            size(targets, 2) ~= config.surfaceResolution ^ 2 || ...
-            any(~isfinite(targets(:))) || any(targets(:) < 0) || any(targets(:) > 1)
-        error('%s targets do not match the normalized surface height-map resolution.', splitName);
+            size(targets, 2) ~= config.voxelResolution ^ 3 || ...
+            any(~isfinite(targets(:))) || ...
+            any((targets(:) ~= 0) & (targets(:) ~= 1))
+        error('%s targets do not match the binary voxel volume resolution.', splitName);
     end
 end
 end
