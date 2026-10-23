@@ -15,9 +15,11 @@
 
 *.png
 
-/examples.mat
-/trained-network.mat
-/prediction.obj
-/target.obj
-/*-prediction.obj
 /*-prediction.mat
+/*-prediction.obj
+/examples.mat
+/input-image.png
+/reference-surface.png
+/surface-comparison.png
+/surface-comparison.svg
+/trained-network.mat

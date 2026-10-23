@@ -2,10 +2,12 @@
 %
 \documentclass[12pt,a4paper]{article}
 \usepackage{amsmath}
-\usepackage[utf8]{inputenc}
+\usepackage{float}
+\usepackage{graphicx}
 \usepackage{polyglossia}
 \usepackage{setspace}
 \usepackage{hyperref}
+
 \setmainlanguage{spanish}
 \setstretch{1.5}
 \hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
@@ -15,11 +17,104 @@
 \begin{titlepage}
   \centering
   {\huge\bfseries Reporte \#8\par}
+  \vspace{1cm}
   {\Large Autor: \itshape Marcos Antonio Pérez Lorenzo\par}
 \end{titlepage}
 
 \pagebreak
 
 \section{Objetivo y alcance}
+
+El objetivo de este ejercicio es implementar una red neuronal que transforme una imagen cuadrada en escala de grises en un mapa de alturas. El programa se entrena con superficies sintéticas suaves y la salida es una superficie abierta definida sobre una cuadrícula.
+
+\section{Representación y datos}
+
+\subsection{Codificación de la superficie}
+
+La red predice una intensidad limpia \(\widehat{I}_{ij}\) entre cero y uno para cada píxel de entrada. La intensidad se convierte en altura relativa centrando el nivel de gris medio:
+\begin{equation}
+  h_{ij}=\widehat{I}_{ij}-0.5,
+  \qquad
+  z_{ij}=s\,h_{ij},
+  \label{eq:height-encoding}
+\end{equation}
+donde \(s\) es el factor de altura. Con \(s=1\), el nivel gris \(0.5\) corresponde a altura cero; con \(s=60\), se amplifican por igual las elevaciones y las depresiones. El factor modifica la geometría vertical que se devuelve y se exporta al modelo OBJ, pero no las intensidades que predice la red.
+
+Cada predicción se representa como una malla regular con \(N^2\) vértices y \(2(N-1)^2\) caras triangulares. Para \(N=64\), la malla contiene \(4096\) vértices y \(7938\) triángulos. Es una única superficie conectada sin base ni paredes laterales; por ello no encierra un volumen.
+
+\subsection{Conjunto sintético}
+
+El generador construye cada superficie objetivo sumando una onda suave de baja frecuencia con varias elevaciones y depresiones gaussianas. Después centra la superficie en el nivel de gris \(0.5\), limita sus intensidades al intervalo \([0,1]\) y crea la entrada añadiendo ruido gaussiano. El ruido se añade a la imagen de entrada, no al objetivo limpio.
+
+La ejecución guardada usa \(320\) ejemplos de \(64\times64\) píxeles, desviación estándar del ruido \(0.025\) y semilla aleatoria \(1\). La partición se hace por superficies completas, no por píxeles de una misma superficie, para evitar que partes de un mismo ejemplo aparezcan en distintos subconjuntos.
+
+\begin{table}[H]
+  \centering
+  \caption{Partición del conjunto sintético usado para entrenar y evaluar el modelo.}
+  \label{tab:data-splits}
+  \begin{tabular}{lrr}
+    \hline
+    Subconjunto & Ejemplos & Proporción aproximada \\
+    \hline
+    Entrenamiento & 224 & 70\% \\
+    Validación & 48 & 15\% \\
+    Prueba reservada & 48 & 15\% \\
+    \hline
+    Total & 320 & 100\% \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\section{Red y entrenamiento}
+
+\subsection{Arquitectura}
+
+La red es una CNN residual pequeña, implementada con arreglos y operaciones básicas compatibles con MATLAB y GNU Octave. Una convolución \(3\times3\) transforma la imagen de un canal en cuatro canales de características. A continuación, un bloque residual aplica dos convoluciones \(3\times3\) de cuatro canales con activaciones ReLU, suma el resultado del bloque a su entrada y vuelve a aplicar ReLU. Una convolución final \(1\times1\) produce la corrección de un canal.
+
+La corrección se escala por \(0.25\), se suma a la imagen de entrada y se recorta al intervalo \([0,1]\). Así, la red aprende una transformación residual cercana a la identidad al inicio del entrenamiento, y puede suavizar el ruido sin cambiar la geometría espacial de la imagen. Las convoluciones y su retropropagación están programadas en los archivos del proyecto; no se utiliza una caja de herramientas de aprendizaje profundo ni una caja de herramientas de procesamiento de imágenes.
+
+\subsection{Protocolo de entrenamiento}
+
+El modelo se optimiza con Adam, tasa de aprendizaje \(0.003\) y lotes de \(16\) superficies. Se permiten hasta \(200\) épocas. Al final de cada época se calculan los errores cuadráticos medios de entrenamiento y validación; se conserva el punto de control con menor RMSE de validación. El criterio de parada temprana requiere \(20\) épocas consecutivas sin una mejora mínima de \(10^{-5}\). El conjunto de prueba no interviene en el ajuste ni en la selección del punto de control; se evalúa una sola vez con el modelo seleccionado.
+
+\section{Resultados}
+
+\subsection{Evaluación con datos sintéticos}
+
+El archivo de modelo guardado registra el mejor punto de control en la época \(190\), dentro de las \(200\) épocas ejecutadas. En esta ejecución no se activó la parada temprana: se alcanzó el límite de épocas. La tabla~\ref{tab:rmse} presenta los RMSE del mejor modelo conservado. Se expresan en unidades de intensidad normalizada; dado que la altura sin escalar es la intensidad menos \(0.5\), los errores tienen el mismo valor numérico en unidades de altura normalizada.
+
+\begin{table}[H]
+  \centering
+  \caption{RMSE registrado para el punto de control seleccionado por validación.}
+  \label{tab:rmse}
+  \begin{tabular}{lr}
+    \hline
+    Subconjunto & RMSE \\
+    \hline
+    Entrenamiento & 0.006128 \\
+    Validación & 0.006130 \\
+    Prueba reservada & 0.006135 \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{Aplicación al ejemplo}
+
+La figura~\ref{fig:surface-result} muestra la entrada suministrada, la imagen de referencia de salida y la superficie predicha por la red. Para esta demostración se aplicó el modelo guardado y se eligió \(\texttt{heightScale}=60\) para hacer visible el relieve y aproximarlo visualmente a la referencia. En la vista isométrica, la malla se rota \(180^\circ\) alrededor del eje vertical \(z\), pasando por el centro de la cuadrícula (sin afectar las alturas) para mejor visualización. Los ejes horizontales indican posiciones de la cuadrícula y el eje vertical representa la altura escalada.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{surface-comparison.png}
+  \caption{Reconstrucción del ejemplo proporcionado. Izquierda: imagen de desenvuelta; centro: imagen envuelta; derecha: malla abierta predicha.}
+  \label{fig:surface-result}
+\end{figure}
+
+La exportación también guarda el mapa de alturas y la intensidad predicha en un archivo MAT, además de la malla OBJ. La referencia visual sirve para ilustrar el resultado esperado en este ejercicio, pero la semejanza de la figura no constituye una medida cuantitativa de error geométrico. Además, como la escala vertical se escogió visualmente, los valores de altura no pueden interpretarse como profundidades reales.
+
+\section{Limitaciones y conclusiones}
+
+El prototipo demuestra una cadena completa de generación de superficies sintéticas, entrenamiento de una CNN convolucional manual e inferencia de un mapa de alturas a partir de una imagen. La baja RMSE de prueba corresponde al dominio sintético y a la distribución de ejemplos generada por el programa; no garantiza el mismo rendimiento para imágenes reales o para otras clases de superficies. La entrada debe tener exactamente el tamaño cuadrado esperado por el modelo (\(64\times64\) en esta ejecución); el código no la redimensiona automáticamente.
+
+Para el ejemplo académico, la predicción se presenta junto a la salida de referencia y como una malla tridimensional inspeccionable. La elección visual de \(\texttt{heightScale}=60\) facilita esa comparación, pero una evaluación geométrica objetiva requeriría una referencia de alturas numérica y una escala conocida.
 
 \end{document}
