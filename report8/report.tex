@@ -22,44 +22,4 @@
 
 \section{Objetivo y alcance}
 
-El proyecto recibe una imagen de profundidad desde arriba y predice directamente una cuadrícula tridimensional de ocupación. Una capa de salida sigmoide estima la probabilidad de que cada vóxel esté ocupado. El tamaño de entrada \(N\times N\), la resolución volumétrica \(R\times R\times R\) y el ancho oculto son configurables. La cuadrícula se umbraliza y se exporta como una malla triangular OBJ.
-
-Una sola vista superior no determina de manera única la geometría oculta. La reconstrucción depende del prior aprendido de los sólidos y las cámaras usados para crear los datos sintéticos; no garantiza recuperar cualquier objeto real.
-
-\section{Datos sintéticos}
-
-La función \texttt{generateSyntheticData.m} genera esferas, elipsoides, prismas rectangulares, cilindros elípticos y conos con dimensiones, posición y orientación variables. Cada sólido se voxeliza en una cuadrícula cúbica. La entrada se forma proyectando el sólido desde arriba y codificando en escala de grises la profundidad ocupada a lo largo del eje \(z\). Cada objetivo es el volumen binario completo aplanado en un vector de \(R^3\) valores.
-
-El script \texttt{generate\_examples.m} configura el tamaño cuadrado de entrada en \texttt{N} (guardado como \texttt{inputSize}), la resolución del objetivo en \texttt{voxelResolution} y las cantidades de las particiones. Con la configuración predeterminada se generan 510 ejemplos de entrenamiento, 85 de validación y 85 de prueba. El archivo \texttt{examples.mat} contiene las particiones y su configuración; se debe regenerar cuando cambie el tamaño de entrada o la resolución de vóxeles.
-
-\section{Arquitectura y entrenamiento}
-
-La imagen se aplana en \(N^2\) entradas y se centra restando \(0.5\). La MLP usa una capa oculta ReLU y una salida sigmoide con \(R^3\) unidades:
-\begin{align*}
-  \mathbf{h} &= \operatorname{ReLU}\!\left((\mathbf{x}-0.5)\mathbf{W}_1+\mathbf{b}_1\right),\\
-  \mathbf{p} &= \sigma\!\left(\mathbf{h}\mathbf{W}_2+\mathbf{b}_2\right).
-\end{align*}
-
-El entrenamiento usa mini lotes, entropía cruzada binaria, ponderación de la clase ocupada, regularización \(L_2\), recorte de gradiente y parada temprana basada en validación. Después se selecciona un umbral de ocupación que maximiza el IoU volumétrico sobre la partición de validación.
-
-\section{Evaluación y exportación}
-
-En el conjunto de prueba se informan entropía cruzada, IoU volumétrico, IoU de silueta y exactitud por vóxel. La exactitud debe interpretarse junto con IoU, ya que la mayoría del volumen puede estar vacío.
-
-La función \texttt{inferImage.m} normaliza y redimensiona la imagen al \(N\times N\) guardado en el checkpoint, aplica la red, umbraliza el volumen y guarda el volumen de probabilidades, la ocupación binaria, la silueta superior y una malla OBJ. La malla es la isosuperficie de la predicción volumétrica, no una elevación calculada píxel a píxel. Los archivos OBJ de predicción y objetivo también se pueden exportar para el ejemplo de prueba reservado.
-
-\section{Limitaciones}
-
-Una imagen de profundidad superior no muestra necesariamente las caras ocultas ni permite distinguir sólidos con la misma proyección. El resultado es una reconstrucción tridimensional condicionada por los ejemplos sintéticos, la resolución de vóxeles y el umbral elegido; no es una recuperación geométrica garantizada. Para usar imágenes reales hacen falta ejemplos emparejados con volúmenes 3D y una escala y pose coherentes.
-
-\section{Ejecución}
-
-\begin{enumerate}
-  \item Configurar \texttt{N} en \texttt{generate\_examples.m}; ejecutar el script para generar \texttt{examples.mat} con entradas \(N\times N\).
-  \item Ejecutar \texttt{train\_network.m} para entrenar la red y guardar \texttt{trained-network.mat}.
-  \item Para una imagen nueva, indicar su ruta en \texttt{infer\_image.m}, o llamar \texttt{inferImage('trained-network.mat', 'depthmap.png')}.
-\end{enumerate}
-
-La prueba de integración está en \texttt{test\_report8.m}.
-
 \end{document}
