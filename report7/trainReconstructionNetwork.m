@@ -22,7 +22,6 @@ if nargin < 9 || isempty(minImprovement)
 end
 if ~isstruct(network) || ~isfield(network, 'N') || ...
         ~isfield(network, 'hiddenUnits') || ...
-        ~isfield(network, 'inputHiddenMask') || ...
         ~isfield(network, 'inputHiddenWeights') || ...
         ~isfield(network, 'hiddenBias') || ...
         ~isfield(network, 'hiddenOutputWeights') || ...
@@ -80,21 +79,16 @@ if ~isnumeric(minImprovement) || ~isreal(minImprovement) || ...
         isinf(minImprovement) || minImprovement < 0
     error('minImprovement must be a finite, non-negative scalar.');
 end
-if ~isequal(size(network.inputHiddenMask), [N, hiddenUnits]) || ...
-        ~isequal(size(network.inputHiddenWeights), [N, hiddenUnits]) || ...
+if ~isequal(size(network.inputHiddenWeights), [N, hiddenUnits]) || ...
         numel(network.hiddenBias) ~= hiddenUnits || ...
         ~isequal(size(network.hiddenOutputWeights), [hiddenUnits, N]) || ...
         numel(network.outputBias) ~= N
-    error('The network parameters do not match its layer sizes.');
-end
-if any(network.inputHiddenWeights(~network.inputHiddenMask) ~= 0)
-    error('Disconnected input-to-hidden weights must remain zero.');
+    error('The network parameters do not match its input, hidden, and output sizes.');
 end
 
 trainingExampleCount = size(wrappedTrainingInputs, 1);
 validationExampleCount = size(wrappedValidationInputs, 1);
 trainingRMSEHistory = zeros(maxEpochs, 1);
-validationRMSEHistory = zeros(maxEpochs, 1);
 bestValidationRMSE = Inf;
 epochsWithoutImprovement = 0;
 stoppedEarly = false;
@@ -106,35 +100,24 @@ for epoch = 1:maxEpochs
         repmat(reshape(network.outputBias, 1, N), trainingExampleCount, 1);
     predictedTargets = 2 * min(1, max(0, outputLinear)) - 1;
     outputError = predictedTargets - originalTrainingTargets;
+    trainingRMSEHistory(epoch) = sqrt(mean(outputError(:).^2));
+
     % Backpropagate MSE through the capped output ReLU and hidden tanh.
     outputGradient = (4 / numel(outputError)) * outputError .* ...
         (outputLinear > 0 & outputLinear < 1);
     hiddenGradient = (outputGradient * network.hiddenOutputWeights') .* ...
         (1 - hiddenActivations.^2);
-    inputHiddenWeightGradient = (wrappedTrainingInputs' * hiddenGradient) .* ...
-        network.inputHiddenMask;
+    inputHiddenWeightGradient = wrappedTrainingInputs' * hiddenGradient;
     hiddenBiasGradient = sum(hiddenGradient, 1);
     hiddenOutputWeightGradient = hiddenActivations' * outputGradient;
     outputBiasGradient = sum(outputGradient, 1);
 
     network.inputHiddenWeights = network.inputHiddenWeights - ...
         learningRate * inputHiddenWeightGradient;
-    network.inputHiddenWeights = network.inputHiddenWeights .* network.inputHiddenMask;
     network.hiddenBias = network.hiddenBias - learningRate * hiddenBiasGradient;
     network.hiddenOutputWeights = network.hiddenOutputWeights - ...
         learningRate * hiddenOutputWeightGradient;
     network.outputBias = network.outputBias - learningRate * outputBiasGradient;
-
-    % Measure both curves after the epoch's update, at the same checkpoint.
-    trainingHiddenLinear = wrappedTrainingInputs * network.inputHiddenWeights + ...
-        repmat(reshape(network.hiddenBias, 1, hiddenUnits), trainingExampleCount, 1);
-    trainingHiddenActivations = tanh(trainingHiddenLinear);
-    trainingOutputLinear = trainingHiddenActivations * ...
-        network.hiddenOutputWeights + ...
-        repmat(reshape(network.outputBias, 1, N), trainingExampleCount, 1);
-    trainingPrediction = 2 * min(1, max(0, trainingOutputLinear)) - 1;
-    trainingRMSEHistory(epoch) = sqrt(mean((trainingPrediction(:) - ...
-        originalTrainingTargets(:)).^2));
 
     validationHiddenLinear = wrappedValidationInputs * network.inputHiddenWeights + ...
         repmat(reshape(network.hiddenBias, 1, hiddenUnits), validationExampleCount, 1);
@@ -145,7 +128,6 @@ for epoch = 1:maxEpochs
     validationPrediction = 2 * min(1, max(0, validationOutputLinear)) - 1;
     currentValidationRMSE = sqrt(mean((validationPrediction(:) - ...
         originalValidationTargets(:)).^2));
-    validationRMSEHistory(epoch) = currentValidationRMSE;
 
     if currentValidationRMSE < bestValidationRMSE - minImprovement
         bestValidationRMSE = currentValidationRMSE;
@@ -179,7 +161,6 @@ finalPrediction = 2 * min(1, max(0, finalOutputLinear)) - 1;
 network.trainingRMSE = sqrt(mean((finalPrediction(:) - ...
     originalTrainingTargets(:)).^2));
 network.trainingRMSEHistory = trainingRMSEHistory(1:epochsRun);
-network.validationRMSEHistory = validationRMSEHistory(1:epochsRun);
 network.epochHistory = (1:epochsRun)';
 network.validationRMSE = bestValidationRMSE;
 network.epochs = epochsRun;
