@@ -8,7 +8,8 @@ function dataset = generate_surface_dataset(outputFile, numExamples, N, noiseStd
 %   sets the MAT-file path, total example count, square image size, input
 %   noise standard deviation (in grayscale units), and reproducible seed.
 %   Set NOISESTD to zero for noiseless input/target pairs. Targets always
-%   remain clean. Each target height is grayscale intensity minus 0.5.
+%   remain clean. Inputs are pixel-wise wrapped at threshold 0.5 before noise
+%   is added. Each target height is grayscale intensity minus 0.5.
 %
 %   DATASET.train.inputImages and DATASET.train.targetHeights have dimensions
 %   N-by-N-by-example. Validation and test splits use the same layout.
@@ -30,6 +31,7 @@ end
 if nargin < 5 || isempty(seed)
     seed = 1;
 end
+wrapThreshold = 0.5;
 
 if ~ischar(outputFile)
     error('outputFile must be a character vector containing a file path.');
@@ -94,7 +96,11 @@ for example = 1:numExamples
         cleanImage = 0.5 * ones(N, N);
     end
     cleanImage = min(1, max(0, cleanImage));
-    noisyImage = min(1, max(0, cleanImage + noiseStd * randn(N, N)));
+    % Apply report 7's modulo wrap to every pixel, then restore grayscale range.
+    wrappedValues = mod(cleanImage + wrapThreshold, 2 * wrapThreshold) - ...
+        wrapThreshold;
+    wrappedImage = wrappedValues + wrapThreshold;
+    noisyImage = min(1, max(0, wrappedImage + noiseStd * randn(N, N)));
 
     cleanImages(:, :, example) = cleanImage;
     noisyImages(:, :, example) = noisyImage;
@@ -110,9 +116,10 @@ trainIndices = permutation(1:numTrain);
 validationIndices = permutation(numTrain + 1:numTrain + numValidation);
 testIndices = permutation(numTrain + numValidation + 1:end);
 
-dataset.formatVersion = 1;
+dataset.formatVersion = 2;
 dataset.N = N;
 dataset.noiseStd = noiseStd;
+dataset.wrapThreshold = wrapThreshold;
 dataset.seed = seed;
 dataset.train.inputImages = noisyImages(:, :, trainIndices);
 dataset.train.targetHeights = targetHeights(:, :, trainIndices);

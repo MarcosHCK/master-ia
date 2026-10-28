@@ -47,9 +47,12 @@ dataset = generate_surface_dataset('small-examples.mat', 24, 32, 0.04, 7);
 ```
 
 Each clean target is formed from a smooth low-frequency wave plus several
-smooth Gaussian hills and depressions. Noise is added to the grayscale input,
-not to the clean target. Use `noiseStd = 0` for noiseless examples. The output
-MAT file contains a struct `dataset` with `N`, `noiseStd`, `seed`, and `train`,
+smooth Gaussian hills and depressions. Before noise is added, each grayscale
+input pixel is wrapped with the report 7 modulo transform at threshold 0.5;
+the wrapped values are shifted back into `[0,1]` grayscale. Noise is added to
+these wrapped inputs, not to the clean targets. Use `noiseStd = 0` for noiseless
+examples. The output MAT file contains a struct `dataset` with `N`, `noiseStd`,
+`wrapThreshold`, `seed`, and `train`,
 `validation`, and `test` splits. Each split contains `inputImages`,
 `targetHeights` (relative heights in `[-0.5,0.5]`), and `cleanImages`. Splitting
 is done between whole surfaces to avoid leakage between pixels of one example.
