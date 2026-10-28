@@ -1,0 +1,70 @@
+% Copyright 2026 MarcosHCK
+%
+\documentclass[12pt,a4paper]{article}
+\usepackage{amsmath}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{polyglossia}
+\usepackage{setspace}
+\usepackage{hyperref}
+
+\setmainlanguage{spanish}
+\setstretch{1.5}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  {\huge\bfseries Reporte \#9\par}
+  \vspace{1cm}
+  {\Large Autor: \itshape Marcos Antonio Pérez Lorenzo\par}
+\end{titlepage}
+
+\pagebreak
+
+\section{Mecanismos de control no digitales}
+
+Un sistema de control automático mide o responde a una variable física y modifica una acción para mantener una condición deseada o ejecutar una secuencia. Antes de la electrónica digital, estas tareas se resolvían mediante piezas mecánicas, elementos térmicos, presión de aire, contactos eléctricos y mecanismos de relojería. Los ejemplos siguientes no requieren un procesador ni un programa digital: algunos regulan una variable mediante realimentación y otros siguen una secuencia fijada mecánicamente.
+
+\subsection{Regulador de presión de una olla a presión}
+
+En una olla tradicional, la presión del vapor actúa sobre una válvula cargada con un peso o un resorte. Cuando la fuerza debida a la presión supera el ajuste de la válvula, esta deja escapar vapor; al bajar la presión, vuelve a cerrarse o reduce la descarga. La repetición de este proceso mantiene la presión cerca del valor de operación. Se utiliza en ollas a presión domésticas; una válvula de seguridad independiente protege además frente a una obstrucción o un fallo del regulador.
+
+\subsection{Termostato y temporizador de deshielo de un refrigerador antiguo}
+
+El termostato electromecánico detecta la temperatura del compartimento con un bulbo y un tubo capilar llenos de fluido. La expansión o contracción del fluido mueve un fuelle que abre o cierra los contactos del compresor, encendiéndolo cuando hace falta enfriar y deteniéndolo al alcanzar la temperatura ajustada. En los modelos sin escarcha, un temporizador de motor y levas interrumpe periódicamente el ciclo de refrigeración y conecta la resistencia de deshielo; un termostato de deshielo puede cortar esa resistencia cuando el evaporador ya está suficientemente caliente. Este conjunto se encuentra en refrigeradores domésticos antiguos y coordina tanto el control de temperatura como el ciclo de descongelación.
+
+\subsection{Regulador centrífugo de velocidad}
+
+Un eje giratorio hace girar dos masas articuladas. Al aumentar la velocidad, la fuerza centrífuga separa las masas y desplaza un manguito y una palanca; el enlace reduce la admisión de vapor o combustible. Si la velocidad cae, un resorte devuelve el mecanismo y aumenta la admisión. Esta realimentación mecánica se usó en máquinas de vapor y se encuentra también en algunos motores y turbinas para limitar o estabilizar su velocidad.
+
+\subsection{Válvula de flotador para nivel de agua}
+
+Un flotador sube y baja con el nivel del líquido y mueve una palanca conectada a una válvula de entrada. Cuando el nivel sube hasta el límite, la válvula se cierra; al consumirse agua y descender el flotador, se abre de nuevo. La posición del flotador proporciona una realimentación directa del nivel, sin necesidad de medirlo electrónicamente. Se usa en cisternas de inodoros y en depósitos de almacenamiento de agua.
+
+\subsection{Termostato bimetálico de una plancha}
+
+El sensor está formado por dos láminas de metales unidos que se dilatan en distinta medida. Al calentarse, el conjunto se curva y acciona un contacto eléctrico; al llegar a la temperatura seleccionada, el contacto interrumpe la corriente de la resistencia. Cuando la plancha se enfría, la lámina recupera su forma y el contacto vuelve a cerrar. Este control de encendido y apagado se utiliza en planchas domésticas y en algunos hornos sencillos.
+
+\subsection{Presostato de un compresor de aire}
+
+La presión del depósito actúa sobre un diafragma o un fuelle que se opone a un resorte ajustable. Al llegar a la presión máxima, el mecanismo abre los contactos y detiene el motor del compresor; cuando la presión baja hasta un límite inferior, los contactos se cierran y el motor vuelve a funcionar. La diferencia entre ambos límites evita arranques demasiado frecuentes. Es un control habitual en compresores de aire para talleres y garajes.
+
+\subsection{Termostato de cera del sistema de refrigeración de un automóvil}
+
+Una cápsula contiene cera que se expande al calentarse y empuja un émbolo. Ese movimiento abre progresivamente la válvula que permite que el refrigerante del motor circule por el radiador; al enfriarse la cera, un resorte cierra la válvula. Así, el motor se calienta con rapidez y luego se mantiene dentro de su intervalo normal de funcionamiento. El mecanismo se instala entre el motor y el circuito del radiador en muchos automóviles con refrigeración líquida.
+
+\subsection{Controlador neumático de climatización}
+
+En un termostato neumático, la temperatura desplaza un elemento sensible —por ejemplo, un fuelle o una lámina bimetálica— que modifica una boquilla y una paleta. El cambio de presión de aire resultante se transmite, y a menudo se amplifica mediante un relé neumático, para mover una válvula de agua caliente o fría o una compuerta de aire. La temperatura de la habitación determina así la acción correctiva sin sensores ni lógica digitales. Estos sistemas se emplean en edificios grandes, como oficinas, escuelas y hospitales, especialmente en instalaciones antiguas de automatización.
+
+\subsection{Flotador de nivel en un carburador}
+
+El flotador de la cuba sube cuando aumenta el nivel de combustible y empuja una aguja que cierra la entrada desde la bomba. Al consumir combustible, el nivel y el flotador descienden, la aguja se separa de su asiento y entra más combustible. Este mecanismo pasivo conserva aproximadamente constante el nivel necesario para alimentar los surtidores. Se utiliza en carburadores de motores de gasolina, como los de automóviles antiguos, motocicletas y pequeños motores.
+
+\subsection{Programador de levas de una lavadora mecánica}
+
+Un pequeño motor hace avanzar lentamente un tambor con levas. Las levas accionan interruptores en un orden y durante intervalos definidos para seleccionar etapas como llenado, lavado, desagüe, aclarado y centrifugado. El programa queda determinado por la forma de las levas y la posición elegida por el usuario, no por instrucciones almacenadas en un microcontrolador. Este tipo de temporizador se usó en lavadoras automáticas de generaciones anteriores; algunos modelos combinaban el programador con interruptores de nivel y termostatos.
+
+\end{document}

@@ -1,0 +1,14 @@
+# Copyright 2026 MarcosHCK
+#
+
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.pdf
+*.run.xml
+*.synctex.gz
